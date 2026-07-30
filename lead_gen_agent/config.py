@@ -28,7 +28,9 @@ except Exception:
     pass
 
 
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # API Key Validation
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def _validate_api_key(key: str, name: str) -> bool:
     """Validate API key format (not empty, no whitespace, reasonable length)."""
@@ -36,7 +38,7 @@ def _validate_api_key(key: str, name: str) -> bool:
         return False
     if len(key) < 10 or len(key) > 256:
         return False
-    if re.search(r'\\s', key):
+    if re.search(r'\s', key):
         return False
     return True
 
@@ -70,7 +72,9 @@ def get_validated_keys() -> tuple:
     return keys, missing
 
 
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Rate Limiter
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class RateLimiter:
     """Simple in-memory rate limiter to prevent API abuse."""
@@ -112,62 +116,6 @@ DEFAULT_MODEL = "gemini-2.5-flash"
 
 # Supported sources
 AVAILABLE_SOURCES = {
-    "quora": {"label": "Quora", "icon": "\u{1F536}", "description": "Q&A discussions"},
-    "pinterest": {"label": "Pinterest", "icon": "\u{1F4CC}", "description": "Visual inspiration & templates"},
+    "quora": {"label": "Quora", "icon": "🔶", "description": "Q&A discussions"},
+    "pinterest": {"label": "Pinterest", "icon": "📌", "description": "Visual inspiration & templates"},
 }
-"""Configuration and environment variable management."""
-
-import os
-
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass  # dotenv not required on Streamlit Cloud
-
-# Streamlit Cloud secrets fallback
-try:
-    import streamlit as st
-    for key in ("GOOGLE_API_KEY", "FIRECRAWL_API_KEY", "COMPOSIO_API_KEY"):
-        if key in st.secrets and not os.getenv(key):
-            os.environ[key] = st.secrets[key]
-except Exception:
-    pass
-
-
-def get_api_keys() -> dict:
-    """Load API keys from environment variables."""
-    return {
-        "google": os.getenv("GOOGLE_API_KEY", ""),
-        "firecrawl": os.getenv("FIRECRAWL_API_KEY", ""),
-        "composio": os.getenv("COMPOSIO_API_KEY", ""),
-    }
-
-
-# Default search settings
-DEFAULT_NUM_LINKS = 5
-DEFAULT_SEARCH_LOCATION = "United States"
-DEFAULT_SEARCH_LANG = "en"
-DEFAULT_MODEL = "gemini-2.5-flash"
-"""Configuration and environment variable management."""
-
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-
-def get_api_keys() -> dict:
-    """Load API keys from environment variables."""
-    return {
-        "google": os.getenv("GOOGLE_API_KEY", ""),
-        "firecrawl": os.getenv("FIRECRAWL_API_KEY", ""),
-        "composio": os.getenv("COMPOSIO_API_KEY", ""),
-    }
-
-
-# Default search settings
-DEFAULT_NUM_LINKS = 5
-DEFAULT_SEARCH_LOCATION = "United States"
-DEFAULT_SEARCH_LANG = "en"
-DEFAULT_MODEL = "gemini-2.5-flash"
