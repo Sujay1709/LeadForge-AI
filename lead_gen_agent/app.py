@@ -1,5 +1,5 @@
 """
-LeadForge AI — SaaS-grade Lead Generation Platform
+LeadForge AI — Copilot-style Lead Generation Platform
 Run with: streamlit run app.py
 """
 
@@ -9,190 +9,137 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-from config import get_api_keys, DEFAULT_NUM_LINKS, DEFAULT_MODEL
+from config import (
+    get_api_keys, get_validated_keys, DEFAULT_NUM_LINKS, DEFAULT_MODEL,
+    AVAILABLE_SOURCES, search_limiter,
+)
 from scraper import search_for_urls, extract_user_info_from_urls, format_leads_to_flat_json
 from agents import create_prompt_transform_agent, transform_query, write_to_google_sheets
 from tools import research_topic
+00; color: #c6ff00; }
+    .metric-label { font-size: 0.68rem; color: #555; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Page Config
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-st.set_page_config(
-    page_title="LeadForge AI",
-    page_icon="⚡",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Custom CSS
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-
-    /* ── Global ── */
-    .stApp { background: #0a0a0a; font-family: 'Inter', sans-serif; }
-    header[data-testid="stHeader"] { background: transparent; }
-    #MainMenu, footer { visibility: hidden; }
-    * { -webkit-tap-highlight-color: transparent; }
-
-    /* ── Hero ── */
-    .hero-title {
-        font-size: 3.2rem; font-weight: 900; line-height: 1.1;
-        background: linear-gradient(135deg, #c6ff00 0%, #76ff03 40%, #00e676 100%);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        margin-bottom: 0.3rem; letter-spacing: -0.03em;
+    /* ── Search input area ── */
+    .stTextArea textarea {
+        background: #111 !important; border: 1px solid #222 !important;
+        color: #eee !important; border-radius: 12px !important;
+        font-size: 0.95rem !important;
     }
-    .hero-sub { font-size: 1.1rem; color: #888; font-weight: 400; margin-bottom: 1.5rem; max-width: 600px; }
-
-    /* ── Metric cards ── */
-    .metric-row { display: flex; gap: 14px; margin: 1.2rem 0; }
-    .metric-card {
-        flex: 1; background: linear-gradient(145deg, #1a1a1a, #111);
-        border: 1px solid #222; border-radius: 14px; padding: 20px;
-        text-align: center; transition: all 0.25s cubic-bezier(.4,0,.2,1);
-        cursor: default; user-select: none;
+    .stTextArea textarea:focus {
+        border-color: #c6ff00 !important;
+        box-shadow: 0 0 0 2px rgba(198,255,0,0.08) !important;
     }
-    .metric-card:hover { border-color: #c6ff00; transform: translateY(-3px); box-shadow: 0 10px 35px rgba(198,255,0,0.1); }
-    .metric-card:active { transform: translateY(0px) scale(0.98); }
-    .metric-value { font-size: 2rem; font-weight: 800; color: #c6ff00; }
-    .metric-label { font-size: 0.75rem; color: #666; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; }
-
-    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-    .badge-live { background: rgba(198,255,0,0.15); color: #c6ff00; animation: livePulse 2s ease-in-out infinite; }
-    @keyframes livePulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
-
-    /* ── Tabs ── */
-    .stTabs [data-baseweb="tab-list"] { gap: 8px; background: transparent; }
-    .stTabs [data-baseweb="tab"] {
-        background: #151515; border: 1px solid #222; border-radius: 8px;
-        color: #888; padding: 8px 20px;
-        transition: all 0.2s cubic-bezier(.4,0,.2,1) !important;
+    .stTextInput input {
+        background: #111 !important; border: 1px solid #222 !important;
+        color: #eee !important; border-radius: 10px !important;
     }
-    .stTabs [data-baseweb="tab"]:hover { background: #1a1a1a; border-color: #444; color: #ccc; transform: translateY(-1px); }
-    .stTabs [data-baseweb="tab"]:active { transform: translateY(1px) scale(0.97); }
-    .stTabs [aria-selected="true"] { background: #1a1a1a !important; border-color: #c6ff00 !important; color: #c6ff00 !important; }
 
-    /* ── Primary Button (Generate) — touch-sensitive ── */
+    /* ── Generate button ── */
     .stButton > button {
         background: linear-gradient(135deg, #c6ff00, #76ff03) !important;
         color: #000 !important; font-weight: 700 !important;
         border: none !important; border-radius: 12px !important;
-        padding: 0.65rem 2rem !important; font-size: 1rem !important;
+        padding: 0.6rem 1.8rem !important; font-size: 0.95rem !important;
         transition: all 0.15s cubic-bezier(.4,0,.2,1) !important;
         box-shadow: 0 2px 8px rgba(198,255,0,0.15) !important;
         position: relative; overflow: hidden;
     }
     .stButton > button:hover {
-        transform: translateY(-2px) scale(1.03) !important;
-        box-shadow: 0 6px 25px rgba(198,255,0,0.35) !important;
+        transform: translateY(-2px) scale(1.02) !important;
+        box-shadow: 0 6px 20px rgba(198,255,0,0.3) !important;
     }
     .stButton > button:active {
         transform: translateY(1px) scale(0.96) !important;
-        box-shadow: 0 1px 4px rgba(198,255,0,0.2) !important;
+        box-shadow: 0 1px 4px rgba(198,255,0,0.15) !important;
         transition: all 0.06s !important;
     }
-    .stButton > button:focus-visible {
-        outline: 2px solid #c6ff00 !important;
-        outline-offset: 3px !important;
-    }
-    /* Ripple effect */
-    .stButton > button::after {
-        content: ''; position: absolute; inset: 0;
-        background: radial-gradient(circle at var(--x,50%) var(--y,50%), rgba(255,255,255,0.3) 0%, transparent 60%);
-        opacity: 0; transition: opacity 0.4s;
-    }
-    .stButton > button:active::after { opacity: 1; transition: opacity 0s; }
 
-    /* ── Download Button — touch-sensitive ── */
+    /* ── Download buttons ── */
     .stDownloadButton > button {
-        background: #111 !important; border: 1px solid #333 !important;
+        background: #111 !important; border: 1px solid #222 !important;
         color: #c6ff00 !important; border-radius: 10px !important;
-        transition: all 0.15s cubic-bezier(.4,0,.2,1) !important;
         font-weight: 600 !important;
+        transition: all 0.15s cubic-bezier(.4,0,.2,1) !important;
     }
     .stDownloadButton > button:hover {
         border-color: #c6ff00 !important; background: #151515 !important;
         transform: translateY(-1px) !important;
-        box-shadow: 0 4px 15px rgba(198,255,0,0.12) !important;
     }
     .stDownloadButton > button:active {
         transform: translateY(1px) scale(0.97) !important;
-        box-shadow: none !important; transition: all 0.06s !important;
     }
 
-    /* ── Sidebar ── */
-    section[data-testid="stSidebar"] { background: #0d0d0d; border-right: 1px solid #1a1a1a; }
-    section[data-testid="stSidebar"] .stMarkdown h3 { color: #c6ff00 !important; }
-    /* Sidebar clear button */
+    /* ── Sidebar buttons ── */
     section[data-testid="stSidebar"] .stButton > button {
-        background: transparent !important; border: 1px solid #333 !important;
-        color: #ff5252 !important; font-size: 0.75rem !important;
-        padding: 0.3rem 0.8rem !important; box-shadow: none !important;
+        background: transparent !important; border: 1px solid #222 !important;
+        color: #888 !important; font-size: 0.72rem !important;
+        padding: 0.25rem 0.6rem !important; box-shadow: none !important;
     }
     section[data-testid="stSidebar"] .stButton > button:hover {
-        border-color: #ff5252 !important; background: rgba(255,82,82,0.08) !important;
-        transform: scale(1.02) !important; box-shadow: none !important;
-    }
-    section[data-testid="stSidebar"] .stButton > button:active {
-        transform: scale(0.95) !important;
+        border-color: #ff5252 !important; color: #ff5252 !important;
+        background: rgba(255,82,82,0.06) !important;
     }
 
-    /* ── Inputs ── */
-    .stTextInput input, .stTextArea textarea {
-        background: #111 !important; border: 1px solid #222 !important;
-        color: #eee !important; border-radius: 10px !important;
-        transition: border-color 0.2s, box-shadow 0.2s !important;
+    /* ── Multiselect / selectbox ── */
+    .stMultiSelect > div > div, .stSelectbox > div > div {
+        background: #111 !important; border-color: #222 !important;
     }
-    .stTextInput input:focus, .stTextArea textarea:focus {
-        border-color: #c6ff00 !important;
-        box-shadow: 0 0 0 2px rgba(198,255,0,0.1) !important;
-    }
+
+    /* ── Slider ── */
     .stSlider [data-baseweb="slider"] [role="slider"] { background: #c6ff00 !important; }
 
     /* ── Toggle ── */
     .stToggle label span { transition: all 0.2s !important; }
 
-    /* ── Pills ── */
-    .speed-stat {
-        font-size: 0.85rem; color: #76ff03; font-weight: 600;
-        padding: 6px 14px; background: rgba(118,255,3,0.08);
-        border-radius: 8px; display: inline-block; margin: 4px;
+    /* ── Tabs ── */
+    .stTabs [data-baseweb="tab-list"] { gap: 6px; background: transparent; }
+    .stTabs [data-baseweb="tab"] {
+        background: #111; border: 1px solid #1a1a1a; border-radius: 8px;
+        color: #666; padding: 8px 18px;
+        transition: all 0.15s cubic-bezier(.4,0,.2,1) !important;
     }
-    .feature-pill {
-        display: inline-block; padding: 6px 14px; border-radius: 20px;
-        background: #151515; border: 1px solid #222; color: #999;
-        font-size: 0.75rem; margin: 3px; font-weight: 500;
-        transition: all 0.2s;
-    }
-    .feature-pill:hover { border-color: #444; color: #ccc; transform: translateY(-1px); }
-    hr { border-color: #1a1a1a !important; }
-
-    /* ── API status cards ── */
-    .api-card {
-        background: #111; border: 1px solid #1e1e1e; border-radius: 12px;
-        padding: 14px; margin: 8px 0; transition: all 0.25s cubic-bezier(.4,0,.2,1);
-    }
-    .api-card:hover { border-color: #333; transform: translateX(3px); }
-    .api-name { font-size: 0.85rem; font-weight: 700; color: #ddd; margin-bottom: 4px; }
-    .api-desc { font-size: 0.72rem; color: #666; line-height: 1.4; }
-    .api-status { font-size: 0.7rem; font-weight: 600; margin-top: 6px; }
-
-    /* ── History card ── */
-    .history-card {
-        padding: 10px 12px; margin: 6px 0; background: #111;
-        border: 1px solid #1e1e1e; border-radius: 10px;
-        transition: all 0.2s cubic-bezier(.4,0,.2,1); cursor: default;
-    }
-    .history-card:hover { border-color: #c6ff00; background: #151515; transform: translateX(3px); }
-    .history-card:active { transform: translateX(1px) scale(0.98); }
+    .stTabs [data-baseweb="tab"]:hover { color: #bbb; border-color: #333; }
+    .stTabs [data-baseweb="tab"]:active { transform: scale(0.97); }
+    .stTabs [aria-selected="true"] { background: #151515 !important; border-color: #c6ff00 !important; color: #c6ff00 !important; }
 
     /* ── File uploader ── */
     .stFileUploader > div { border-radius: 12px !important; }
 
-    /* ── Selectbox ── */
-    .stSelectbox > div > div { background: #111 !important; border-color: #222 !important; }
+    /* ── Error / warning ── */
+    .error-banner {
+        padding: 12px 16px; border-radius: 10px;
+        background: rgba(255,82,82,0.08); border: 1px solid rgba(255,82,82,0.2);
+        color: #ff8a80; font-size: 0.85rem; margin: 8px 0;
+    }
+    .warning-banner {
+        padding: 12px 16px; border-radius: 10px;
+        background: rgba(255,171,0,0.08); border: 1px solid rgba(255,171,0,0.2);
+        color: #ffcc80; font-size: 0.85rem; margin: 8px 0;
+    }
+
+    /* ── Footer ── */
+    .app-footer {
+        text-align: center; color: #222; font-size: 0.65rem;
+        padding: 24px 0 12px; border-top: 1px solid #111; margin-top: 40px;
+    }
+
+    /* ── Speed stats ── */
+    .speed-stat {
+        font-size: 0.8rem; color: #76ff03; font-weight: 600;
+        padding: 5px 12px; background: rgba(118,255,3,0.06);
+        border-radius: 8px; display: inline-block; margin: 3px;
+    }
+
+    /* ── API status card ── */
+    .api-card {
+        background: #111; border: 1px solid #1a1a1a; border-radius: 10px;
+        padding: 12px; margin: 6px 0;
+    }
+    .api-name { font-size: 0.78rem; font-weight: 700; color: #ccc; }
+    .api-desc { font-size: 0.68rem; color: #555; line-height: 1.4; margin-top: 3px; }
+    .api-status { font-size: 0.65rem; font-weight: 600; margin-top: 5px; }
+
+    hr { border-color: #1a1a1a !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -206,6 +153,8 @@ for key, default in {
     "processing_time": 0.0,
     "search_history": [],
     "sheet_url": None,
+    "pinned_searches": [],
+    "active_search": None,
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -220,157 +169,122 @@ composio_key = _keys["composio"]
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Enhanced Sidebar
+# Sidebar — Copilot Style
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 with st.sidebar:
-    # Logo area
+    # Logo
     st.markdown(
-        '<div style="text-align:center;padding:10px 0 20px;">'
-        '<span style="font-size:2rem;">⚡</span><br>'
-        '<span style="font-size:1.3rem;font-weight:800;'
-        'background:linear-gradient(135deg,#c6ff00,#00e676);'
-        '-webkit-background-clip:text;-webkit-text-fill-color:transparent;">'
-        'LeadForge AI</span>'
+        '<div class="logo-mark">'
+        '<div class="logo-icon">⚡</div>'
+        '<div><div class="logo-text">LeadForge AI</div>'
+        '<div class="logo-sub">AI Lead Discovery</div></div>'
         '</div>', unsafe_allow_html=True
     )
 
-    st.markdown("### 🎛️ Search Controls")
+    # Source selector
+    st.markdown("### Sources")
+    selected_sources = st.multiselect(
+        "Search platforms",
+        options=list(AVAILABLE_SOURCES.keys()),
+        default=["quora"],
+        format_func=lambda x: f"{AVAILABLE_SOURCES[x]['icon']} {AVAILABLE_SOURCES[x]['label']}",
+        label_visibility="collapsed",
+    )
 
+    # Controls
+    st.markdown("### Controls")
     num_links = st.slider(
-        "🔗 Quora pages to scan",
-        min_value=1, max_value=10, value=DEFAULT_NUM_LINKS,
-        help="More pages = more leads but slower. Each page costs ~2 Firecrawl credits.",
+        "Pages per source", min_value=1, max_value=10, value=DEFAULT_NUM_LINKS,
+        help="More pages = more leads but slower",
     )
 
-    st.markdown(
-        f'<div style="text-align:center;color:#555;font-size:0.72rem;margin:-8px 0 12px;">'
-        f'Estimated credits: ~{num_links * 2} search + ~{num_links} extract'
-        f'</div>', unsafe_allow_html=True
-    )
-
-    enable_research = st.toggle(
-        "🌐 Web Research Mode",
-        value=True,
-        help="Searches Google & Wikipedia first to build context, then uses that to find better Quora leads.",
-    )
+    enable_research = st.toggle("🌐 Web Research Mode", value=True,
+        help="Pre-research the topic via Google & Wikipedia for better results")
 
     st.markdown("---")
 
-    # API Status Cards
-    st.markdown("### 🔌 Connected Services")
+    # Pinned Searches
+    if st.session_state.pinned_searches:
+        st.markdown('<div class="section-label">PINNED</div>', unsafe_allow_html=True)
+        for ps in st.session_state.pinned_searches:
+            st.markdown(
+                f'<div class="lead-list-item pinned">'
+                f'<div class="lead-item-title">• {ps["query"][:40]}</div>'
+                f'<div class="lead-item-meta">{ps["leads"]} leads</div>'
+                f'</div>', unsafe_allow_html=True
+            )
 
-    # Gemini
-    g_status = "🟢 Connected" if google_key else "🔴 Missing"
-    g_color = "#c6ff00" if google_key else "#ff5252"
-    st.markdown(
-        f'<div class="api-card">'
-        f'<div class="api-name">🧠 Google Gemini</div>'
-        f'<div class="api-desc">AI model for query transformation. Converts your natural language '
-        f'descriptions into optimized search queries. Uses <b>{DEFAULT_MODEL}</b> (free tier).</div>'
-        f'<div class="api-status" style="color:{g_color};">{g_status}</div>'
-        f'</div>', unsafe_allow_html=True
-    )
+    # Recent Searches
+    if st.session_state.search_history:
+        st.markdown('<div class="section-label">RECENT</div>', unsafe_allow_html=True)
+        for item in reversed(st.session_state.search_history[-6:]):
+            sources_str = ", ".join(item.get("sources", ["quora"]))
+            st.markdown(
+                f'<div class="lead-list-item">'
+                f'<div class="lead-item-title">{item["query"][:42]}'
+                f'<span class="lead-item-count">{item["leads"]} leads</span></div>'
+                f'<div class="lead-item-meta">{sources_str} · {item["time"]}</div>'
+                f'</div>', unsafe_allow_html=True
+            )
 
-    # Firecrawl
-    f_status = "🟢 Connected" if firecrawl_key else "🔴 Missing"
-    f_color = "#c6ff00" if firecrawl_key else "#ff5252"
-    st.markdown(
-        f'<div class="api-card">'
-        f'<div class="api-name">🔥 Firecrawl</div>'
-        f'<div class="api-desc">Web search & AI extraction engine. Discovers Quora discussions '
-        f'matching your query, then uses LLM to extract structured user data (usernames, bios, '
-        f'upvotes, profile URLs) from each page.</div>'
-        f'<div class="api-status" style="color:{f_color};">{f_status}</div>'
-        f'</div>', unsafe_allow_html=True
-    )
-
-    # Composio
-    c_status = "🟢 Connected" if composio_key else "⚪ Optional"
-    c_color = "#c6ff00" if composio_key else "#888"
-    st.markdown(
-        f'<div class="api-card">'
-        f'<div class="api-name">📊 Composio</div>'
-        f'<div class="api-desc">Google Sheets integration. Automatically creates a new spreadsheet '
-        f'with your extracted leads. Requires one-time Google account connection via '
-        f'<a href="https://app.composio.dev" style="color:#c6ff00;">Composio dashboard</a>.</div>'
-        f'<div class="api-status" style="color:{c_color};">{c_status}</div>'
-        f'</div>', unsafe_allow_html=True
-    )
-
-    st.markdown("---")
-
-    # Search History
-    hist_header, hist_clear = st.columns([3, 1])
-    with hist_header:
-        st.markdown("### 🕒 History")
-    with hist_clear:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🗑️ Clear", key="clear_history", use_container_width=True):
+        # Clear button
+        if st.button("Clear history", key="clear_history"):
             st.session_state.search_history = []
+            st.session_state.pinned_searches = []
             st.session_state.leads_df = None
             st.session_state.sheet_url = None
             st.session_state.run_count = 0
             st.session_state.total_leads = 0
             st.session_state.processing_time = 0.0
-            st.rerun()
-
-    if st.session_state.search_history:
-        for item in reversed(st.session_state.search_history[-8:]):
-            st.markdown(
-                f'<div class="history-card">'
-                f'<div style="font-size:0.8rem;color:#c6ff00;font-weight:600;">'
-                f'✅ {item["leads"]} leads found</div>'
-                f'<div style="font-size:0.75rem;color:#aaa;margin:3px 0;">'
-                f'"{item["query"][:50]}"</div>'
-                f'<div style="font-size:0.65rem;color:#444;">'
-                f'🔍 {item["search_term"]} · {item["time"]}</div>'
-                f'</div>', unsafe_allow_html=True
-            )
-    else:
-        st.markdown(
-            '<div style="text-align:center;padding:20px 0;color:#333;font-size:0.8rem;">'
-            'No searches yet.'
-            '</div>', unsafe_allow_html=True
-        )
 
     st.markdown("---")
+
+    # Connected Services
+    st.markdown("### Services")
+    g_color = "#c6ff00" if google_key else "#ff5252"
+    f_color = "#c6ff00" if firecrawl_key else "#ff5252"
+    c_color = "#c6ff00" if composio_key else "#666"
+
     st.markdown(
-        '<div style="text-align:center;color:#333;font-size:0.65rem;padding:8px 0;">'
-        'Keys loaded from .env · No data stored externally'
-        '</div>', unsafe_allow_html=True
+        f'<div class="api-card">'
+        f'<div class="api-name">🧠 Gemini</div>'
+        f'<div class="api-desc">Query transform · {DEFAULT_MODEL}</div>'
+        f'<div class="api-status" style="color:{g_color};">{"● Connected" if google_key else "○ Missing"}</div>'
+        f'</div>'
+        f'<div class="api-card">'
+        f'<div class="api-name">🔥 Firecrawl</div>'
+        f'<div class="api-desc">Web search + AI extraction</div>'
+        f'<div class="api-status" style="color:{f_color};">{"● Connected" if firecrawl_key else "○ Missing"}</div>'
+        f'</div>'
+        f'<div class="api-card">'
+        f'<div class="api-name">📊 Composio</div>'
+        f'<div class="api-desc">Google Sheets export</div>'
+        f'<div class="api-status" style="color:{c_color};">{"● Connected" if composio_key else "○ Optional"}</div>'
+        f'</div>', unsafe_allow_html=True
+    )
+
+    # Rate limit info
+    remaining = search_limiter.remaining()
+    st.markdown(
+        f'<div style="text-align:center;color:#333;font-size:0.6rem;padding:12px 0;">'
+        f'{remaining}/10 searches remaining this minute'
+        f'</div>', unsafe_allow_html=True
     )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Hero
+# Main Content Area
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-col_hero, col_badge = st.columns([4, 1])
-with col_hero:
-    st.markdown('<div class="hero-title">LeadForge AI</div>', unsafe_allow_html=True)
-    st.markdown(
-        '<div class="hero-sub">'
-        'AI-powered lead discovery from Quora. Describe your ideal customer, '
-        'get qualified leads with scores — exported to Google Sheets automatically.'
-        '</div>', unsafe_allow_html=True
-    )
-with col_badge:
-    st.markdown('<br><span class="badge badge-live">● Live</span>', unsafe_allow_html=True)
 
+# Header
 st.markdown(
-    '<div>'
-    '<span class="feature-pill">🎯 Smart Search</span>'
-    '<span class="feature-pill">🧠 AI Extraction</span>'
-    '<span class="feature-pill">📊 Lead Scoring</span>'
-    '<span class="feature-pill">⚡ Bulk Processing</span>'
-    '<span class="feature-pill">📥 CSV / Sheets Export</span>'
+    '<div class="main-header">'
+    '<div class="main-title">⚡ LeadForge AI</div>'
+    '<div style="font-size:0.75rem;color:#555;">AI-powered lead discovery from Quora & Pinterest</div>'
     '</div>', unsafe_allow_html=True
 )
-st.markdown("---")
 
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Metrics
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Metrics row
 st.markdown(
     '<div class="metric-row">'
     f'<div class="metric-card"><div class="metric-value">{st.session_state.run_count}</div><div class="metric-label">Searches</div></div>'
@@ -379,8 +293,8 @@ st.markdown(
     f'<div class="metric-card"><div class="metric-value">{DEFAULT_MODEL.split("-")[0].upper()} {DEFAULT_MODEL.split("-")[1]}</div><div class="metric-label">AI Model</div></div>'
     '</div>', unsafe_allow_html=True
 )
-st.markdown("---")
 
+st.markdown("---")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Tabs
@@ -388,14 +302,14 @@ st.markdown("---")
 tab_search, tab_bulk, tab_results = st.tabs(["🔍 AI Search", "📤 Bulk Upload", "📊 Results"])
 
 
-# ── Tab 1: AI Search ──────────────────────────
+# ── Tab 1: AI Search ────────────────────────
 with tab_search:
-    # Quick-select from history
+    # Re-run from history
     if st.session_state.search_history:
-        history_labels = ["Type a new search..."] + [
-            f"{h['query'][:55]}" for h in reversed(st.session_state.search_history[-8:])
+        history_labels = ["New search..."] + [
+            f"{h['query'][:55]}" for h in reversed(st.session_state.search_history[-6:])
         ]
-        picked = st.selectbox("📋 Or re-run a previous search:", history_labels, index=0, label_visibility="collapsed")
+        picked = st.selectbox("Re-run a previous search:", history_labels, index=0, label_visibility="collapsed")
         prefill = picked if picked != history_labels[0] else ""
     else:
         prefill = ""
@@ -405,79 +319,93 @@ with tab_search:
         user_query = st.text_area(
             "query",
             value=prefill,
-            placeholder="e.g., SaaS founders looking for customer onboarding tools\n\nDescribe the type of leads you want to find. Be specific about industry, pain points, or tools they need.",
-            height=110, label_visibility="collapsed",
+            placeholder="e.g., Pizza website templates and design inspiration\n\nDescribe leads, topics, or content you want to find across Quora and Pinterest.",
+            height=100, label_visibility="collapsed",
         )
     with col_go:
         st.markdown("<br>", unsafe_allow_html=True)
         run_search = st.button("⚡ Generate", use_container_width=True)
 
+    # Source indicator
+    if selected_sources:
+        source_tags = ""
+        for s in selected_sources:
+            css_class = f"source-{s}"
+            source_tags += f'<span class="source-tag {css_class}">{AVAILABLE_SOURCES[s]["icon"]} {AVAILABLE_SOURCES[s]["label"]}</span> '
+        st.markdown(f'<div style="margin:-8px 0 12px;">Searching: {source_tags}</div>', unsafe_allow_html=True)
+
     if run_search:
         if not user_query.strip():
-            st.error("Describe the leads you want to find.")
+            st.markdown('<div class="error-banner">Describe the leads or content you want to find.</div>', unsafe_allow_html=True)
             st.stop()
-        if not google_key or not firecrawl_key:
-            missing = []
-            if not google_key: missing.append("GOOGLE_API_KEY")
-            if not firecrawl_key: missing.append("FIRECRAWL_API_KEY")
-            st.error(f"Missing in .env: {', '.join(missing)}")
+
+        # Validate keys
+        _, missing_keys = get_validated_keys()
+        if missing_keys:
+            st.markdown(f'<div class="error-banner">Missing API keys: {", ".join(missing_keys)}. Add them to .env or Streamlit secrets.</div>', unsafe_allow_html=True)
+            st.stop()
+
+        # Rate limit check
+        if not search_limiter.check():
+            wait_time = search_limiter.reset_in()
+            st.markdown(f'<div class="warning-banner">Rate limit reached. Try again in {wait_time:.0f} seconds.</div>', unsafe_allow_html=True)
+            st.stop()
+
+        if not selected_sources:
+            st.markdown('<div class="error-banner">Select at least one source in the sidebar.</div>', unsafe_allow_html=True)
             st.stop()
 
         start_time = time.time()
 
         try:
             # Step 1 — Transform query
-            with st.status("🧠 AI is optimizing your search query...", expanded=True) as s:
+            with st.status("🧠 Optimizing your search query...", expanded=True) as s:
                 client = create_prompt_transform_agent(google_key)
                 company_description = transform_query(client, user_query)
-                st.write(f"**Optimized search:** `{company_description}`")
+                st.write(f'Query → **"{company_description}"**')
                 s.update(label=f'✅ Query → "{company_description}"', state="complete")
 
-            # Step 1.5 — Web Research (Google + Wikipedia)
+            # Step 1.5 — Web Research
             research_context = ""
             if enable_research:
-                with st.status("🌐 Researching topic via Google & Wikipedia...", expanded=True) as s:
+                with st.status("🌐 Researching topic...", expanded=True) as s:
                     research = research_topic(company_description, google_key)
-
                     google_count = len(research.get("google_results", []))
                     wiki_count = len(research.get("wiki_results", []))
 
                     if research.get("google_results"):
-                        st.write("**Google Results:**")
                         for r in research["google_results"][:3]:
                             title = r.get("title", "")
-                            snippet = r.get("snippet", "")
                             link = r.get("link", "")
-                            if title:
-                                if link:
-                                    st.write(f"- [{title}]({link})")
-                                else:
-                                    st.write(f"- {title}: {snippet[:100]}")
-
-                    if research.get("wiki_results"):
-                        st.write("**Wikipedia:**")
-                        for r in research["wiki_results"]:
-                            st.write(f"- **{r['title']}**: {r['summary'][:120]}...")
+                            if title and link:
+                                st.write(f"- [{title}]({link})")
+                            elif title:
+                                st.write(f"- {title}")
 
                     research_context = research.get("summary_context", "")
                     s.update(label=f"✅ Research: {google_count} web + {wiki_count} wiki results", state="complete")
 
-            # Step 2 — Search Quora
-            with st.status(f"🔍 Searching Quora for {num_links} relevant pages...", expanded=True) as s:
-                urls = search_for_urls(company_description, firecrawl_key, num_links)
-                if not urls:
-                    st.warning("No Quora URLs found. Try rephrasing your query.")
+            # Step 2 — Search sources
+            with st.status(f"🔍 Searching {', '.join(selected_sources)} for {num_links} pages each...", expanded=True) as s:
+                url_items = search_for_urls(
+                    company_description, firecrawl_key, num_links,
+                    sources=selected_sources,
+                )
+                if not url_items:
+                    st.warning("No URLs found. Try rephrasing your query or adding more sources.")
                     st.stop()
-                for i, u in enumerate(urls, 1):
-                    st.write(f"{i}. {u}")
-                s.update(label=f"✅ Found {len(urls)} Quora discussions", state="complete")
+
+                for i, item in enumerate(url_items, 1):
+                    source_label = item.get("source", "quora").capitalize()
+                    st.write(f"{i}. [{source_label}] {item['url']}")
+                s.update(label=f"✅ Found {len(url_items)} pages across {len(selected_sources)} sources", state="complete")
 
             # Step 3 — Extract leads
-            with st.status("🧠 AI is extracting lead data from each page...", expanded=True) as s:
-                user_info_list = extract_user_info_from_urls(urls, firecrawl_key)
+            with st.status("🧠 Extracting lead data...", expanded=True) as s:
+                user_info_list = extract_user_info_from_urls(url_items, firecrawl_key)
                 leads = format_leads_to_flat_json(user_info_list)
                 if not leads:
-                    st.warning("No leads extracted. The pages may have limited user data. Try a different query.")
+                    st.warning("No leads extracted. Try a different query.")
                     st.stop()
                 s.update(label=f"✅ Extracted {len(leads)} leads", state="complete")
 
@@ -504,64 +432,100 @@ with tab_search:
                 "query": user_query,
                 "search_term": company_description,
                 "leads": len(df),
-                "researched": enable_research,
+                "sources": selected_sources,
                 "time": datetime.now().strftime("%b %d, %I:%M %p"),
             })
 
-            # Step 4 — Export to Sheets (subprocess — won't crash main app)
+            # Step 4 — Sheets export
             if composio_key:
                 with st.status("📤 Exporting to Google Sheets...", expanded=True) as s:
                     sheet_url = write_to_google_sheets(leads, composio_key)
                     if sheet_url.startswith("Error"):
-                        s.update(label=f"⚠️ Sheets: {sheet_url}", state="error")
-                        st.warning(f"Sheets export issue: {sheet_url}. Leads are still available below.")
+                        s.update(label=f"⚠️ {sheet_url[:80]}", state="error")
                     else:
                         st.session_state.sheet_url = sheet_url
                         s.update(label="✅ Exported to Google Sheets", state="complete")
-                        st.markdown(f"📊 **[Open Google Sheet]({sheet_url})**")
 
-            # Show results inline (no st.rerun — avoids crash)
-            st.success(f"Done — {len(df)} leads scored in {elapsed:.1f}s")
+            # Results
+            st.success(f"Found {len(df)} leads in {elapsed:.1f}s")
 
-            # Preview
-            st.markdown("### Results Preview")
+            # Results header
+            st.markdown(
+                f'<div class="results-header">'
+                f'<span class="results-title">• {user_query[:50]}</span>'
+                f'<span class="results-badge">{len(df)} leads</span>'
+                f'</div>', unsafe_allow_html=True
+            )
+
             st.dataframe(df, use_container_width=True, hide_index=True, height=350)
 
             # Downloads
             col_dl1, col_dl2 = st.columns(2)
             with col_dl1:
                 st.download_button(
-                    "📥 Download CSV",
-                    df.to_csv(index=False),
+                    "📥 CSV", df.to_csv(index=False),
                     f"leadforge_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                     "text/csv", use_container_width=True,
                 )
             with col_dl2:
                 st.download_button(
-                    "📥 Download JSON",
-                    df.to_json(orient="records", indent=2),
+                    "📥 JSON", df.to_json(orient="records", indent=2),
                     f"leadforge_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
                     "application/json", use_container_width=True,
                 )
 
+            if st.session_state.sheet_url and not st.session_state.sheet_url.startswith("Error"):
+                st.markdown(f"📊 **[Open Google Sheet]({st.session_state.sheet_url})**")
+
+        except requests.exceptions.HTTPError as e:
+            if e.response is not None and e.response.status_code == 402:
+                st.markdown(
+                    '<div class="error-banner">'
+                    '💳 Firecrawl credits exhausted (402 Payment Required). '
+                    '<a href="https://www.firecrawl.dev/app/api-keys" style="color:#c6ff00;">Add credits here</a> '
+                    'or reduce pages per search.'
+                    '</div>', unsafe_allow_html=True
+                )
+            else:
+                st.markdown(f'<div class="error-banner">HTTP Error: {e}</div>', unsafe_allow_html=True)
         except Exception as e:
-            st.error(f"Something went wrong: {e}")
+            error_msg = str(e)
+            # Never expose API keys in error messages
+            for key_val in [google_key, firecrawl_key, composio_key]:
+                if key_val and key_val in error_msg:
+                    error_msg = error_msg.replace(key_val, "***")
+            st.markdown(f'<div class="error-banner">Something went wrong: {error_msg}</div>', unsafe_allow_html=True)
 
 
 # ── Tab 2: Bulk Upload ────────────────────────
 with tab_bulk:
     st.markdown("### Upload CSV for Instant Scoring")
     st.markdown(
-        '<div style="color:#888;font-size:0.9rem;margin-bottom:1rem;">'
-        'Upload any CSV with lead data. LeadForge auto-detects columns and scores every row.'
+        '<div style="color:#666;font-size:0.85rem;margin-bottom:1rem;">'
+        'Upload any CSV with lead data. Auto-detects columns and scores every row.'
         '</div>', unsafe_allow_html=True
     )
 
     uploaded = st.file_uploader("Drop your CSV here", type=["csv"], label_visibility="collapsed")
 
     if uploaded:
+        # Security: limit file size (10MB)
+        if uploaded.size > 10 * 1024 * 1024:
+            st.markdown('<div class="error-banner">File too large. Max 10MB.</div>', unsafe_allow_html=True)
+            st.stop()
+
         start = time.time()
-        df_raw = pd.read_csv(uploaded)
+        try:
+            df_raw = pd.read_csv(uploaded)
+        except Exception as e:
+            st.markdown(f'<div class="error-banner">Invalid CSV: {e}</div>', unsafe_allow_html=True)
+            st.stop()
+
+        # Security: limit row count
+        if len(df_raw) > 50000:
+            st.markdown('<div class="warning-banner">CSV truncated to 50,000 rows.</div>', unsafe_allow_html=True)
+            df_raw = df_raw.head(50000)
+
         row_count = len(df_raw)
 
         # Auto-detect columns
@@ -642,13 +606,15 @@ with tab_results:
                 st.markdown("#### Score Distribution")
                 bins = pd.cut(df["Lead Score"], bins=[0, 25, 50, 75, 100], labels=["0-25", "26-50", "51-75", "76-100"])
                 st.bar_chart(bins.value_counts().sort_index(), color="#c6ff00")
-            if "Post Type" in df.columns:
-                st.markdown("#### By Post Type")
-                st.bar_chart(df["Post Type"].fillna("Unknown").value_counts(), color="#76ff03")
+
+            # Source breakdown
+            if "Source" in df.columns:
+                st.markdown("#### By Source")
+                st.bar_chart(df["Source"].value_counts(), color="#76ff03")
 
         with col_table:
             st.markdown("#### Top Leads")
-            show_cols = [c for c in ["Username", "Bio", "Lead Score", "Upvotes", "Post Type", "Profile URL"] if c in df.columns]
+            show_cols = [c for c in ["Source", "Username", "Bio", "Lead Score", "Upvotes", "Post Type", "Profile URL"] if c in df.columns]
             st.dataframe(df.head(25)[show_cols] if show_cols else df.head(25), use_container_width=True, hide_index=True, height=450)
 
         st.markdown("---")
@@ -665,18 +631,17 @@ with tab_results:
                 f"leadforge_{datetime.now().strftime('%Y%m%d_%H%M')}.json", "application/json", use_container_width=True)
     else:
         st.markdown(
-            '<div style="text-align:center;padding:80px 0;color:#444;">'
+            '<div style="text-align:center;padding:80px 0;color:#333;">'
             '<div style="font-size:3rem;margin-bottom:12px;">📊</div>'
-            '<div style="font-size:1.1rem;">No leads yet</div>'
-            '<div style="font-size:0.85rem;color:#333;">Run an AI search or upload a CSV to get started</div>'
+            '<div style="font-size:1.1rem;color:#555;">No leads yet</div>'
+            '<div style="font-size:0.82rem;color:#333;">Run an AI search or upload a CSV to get started</div>'
             '</div>', unsafe_allow_html=True
         )
 
 
 # Footer
-st.markdown("---")
 st.markdown(
-    '<div style="text-align:center;color:#333;font-size:0.7rem;padding:12px 0;">'
+    '<div class="app-footer">'
     'LeadForge AI · Firecrawl · Gemini · Composio · Streamlit'
     '</div>', unsafe_allow_html=True
 )
