@@ -16,7 +16,129 @@ from config import (
 from scraper import search_for_urls, extract_user_info_from_urls, format_leads_to_flat_json
 from agents import create_prompt_transform_agent, transform_query, write_to_google_sheets
 from tools import research_topic
-00; color: #c6ff00; }
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Page Config
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+st.set_page_config(
+    page_title="LeadForge AI",
+    page_icon="⚡",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Custom CSS — Copilot-inspired dark UI
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+    /* ── Global ── */
+    .stApp { background: #0a0a0a; font-family: 'Inter', sans-serif; }
+    header[data-testid="stHeader"] { background: transparent; }
+    #MainMenu, footer { visibility: hidden; }
+    * { -webkit-tap-highlight-color: transparent; }
+
+    /* ── Sidebar — Copilot style ── */
+    section[data-testid="stSidebar"] {
+        background: #0d0d0d; border-right: 1px solid #1a1a1a;
+        padding-top: 0 !important;
+    }
+    section[data-testid="stSidebar"] .stMarkdown h3 { color: #c6ff00 !important; font-size: 0.8rem !important; text-transform: uppercase; letter-spacing: 0.08em; }
+
+    /* ── Logo mark ── */
+    .logo-mark {
+        display: flex; align-items: center; gap: 12px;
+        padding: 20px 8px 16px; border-bottom: 1px solid #1a1a1a; margin-bottom: 16px;
+    }
+    .logo-icon {
+        width: 40px; height: 40px; border-radius: 12px;
+        background: linear-gradient(135deg, #c6ff00, #00e676);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.2rem; flex-shrink: 0;
+    }
+    .logo-text { font-size: 1.1rem; font-weight: 800; color: #eee; }
+    .logo-sub { font-size: 0.65rem; color: #555; margin-top: 2px; }
+
+    /* ── Pinned & Recent sections ── */
+    .section-label {
+        font-size: 0.65rem; font-weight: 600; color: #555;
+        text-transform: uppercase; letter-spacing: 0.1em;
+        margin: 16px 0 8px; padding: 0 4px;
+    }
+
+    /* ── Lead list item (sidebar) ── */
+    .lead-list-item {
+        padding: 10px 12px; margin: 4px 0; background: #111;
+        border: 1px solid #1a1a1a; border-radius: 10px;
+        cursor: pointer; transition: all 0.15s cubic-bezier(.4,0,.2,1);
+    }
+    .lead-list-item:hover { border-color: #333; background: #151515; transform: translateX(2px); }
+    .lead-list-item:active { transform: scale(0.98); }
+    .lead-list-item.pinned { border-left: 3px solid #c6ff00; }
+    .lead-item-title { font-size: 0.82rem; font-weight: 600; color: #ddd; }
+    .lead-item-meta { font-size: 0.68rem; color: #666; margin-top: 3px; }
+    .lead-item-count {
+        display: inline-block; padding: 2px 8px; border-radius: 6px;
+        background: rgba(198,255,0,0.1); color: #c6ff00;
+        font-size: 0.65rem; font-weight: 600; margin-left: 4px;
+    }
+
+    /* ── Main content area ── */
+    .main-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 8px 0 20px; border-bottom: 1px solid #1a1a1a; margin-bottom: 20px;
+    }
+    .main-title { font-size: 1.5rem; font-weight: 800; color: #eee; }
+
+    /* ── Step indicators (chat-like) ── */
+    .step-row {
+        display: flex; align-items: flex-start; gap: 12px;
+        padding: 12px 0; border-bottom: 1px solid #0f0f0f;
+    }
+    .step-icon {
+        width: 28px; height: 28px; border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.8rem; flex-shrink: 0; margin-top: 2px;
+    }
+    .step-icon.done { background: rgba(198,255,0,0.15); }
+    .step-icon.working { background: rgba(255,171,0,0.15); }
+    .step-icon.error { background: rgba(255,82,82,0.15); }
+    .step-text { font-size: 0.88rem; color: #bbb; line-height: 1.5; }
+    .step-text strong { color: #eee; }
+
+    /* ── Lead results table ── */
+    .results-header {
+        display: flex; align-items: center; gap: 12px;
+        padding: 14px 16px; background: #111; border: 1px solid #1a1a1a;
+        border-radius: 12px 12px 0 0; margin-top: 20px;
+    }
+    .results-title { font-size: 0.95rem; font-weight: 700; color: #eee; }
+    .results-badge {
+        padding: 3px 10px; border-radius: 6px;
+        background: rgba(198,255,0,0.12); color: #c6ff00;
+        font-size: 0.7rem; font-weight: 600;
+    }
+
+    /* ── Source tags ── */
+    .source-tag {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 3px 10px; border-radius: 6px;
+        font-size: 0.68rem; font-weight: 600;
+    }
+    .source-quora { background: rgba(185,43,39,0.15); color: #e74c3c; }
+    .source-pinterest { background: rgba(189,8,28,0.15); color: #e60023; }
+
+    /* ── Metric cards ── */
+    .metric-row { display: flex; gap: 12px; margin: 1rem 0; }
+    .metric-card {
+        flex: 1; background: #111; border: 1px solid #1a1a1a;
+        border-radius: 12px; padding: 16px; text-align: center;
+        transition: all 0.2s cubic-bezier(.4,0,.2,1);
+    }
+    .metric-card:hover { border-color: #333; transform: translateY(-2px); }
+    .metric-value { font-size: 1.8rem; font-weight: 800; color: #c6ff00; }
     .metric-label { font-size: 0.68rem; color: #555; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
 
     /* ── Search input area ── */
