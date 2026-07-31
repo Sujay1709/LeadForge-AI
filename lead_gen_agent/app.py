@@ -5,6 +5,7 @@ Run with: streamlit run app.py
 
 import time
 import json
+import requests
 import streamlit as st
 import pandas as pd
 from datetime import datetime
