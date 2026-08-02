@@ -164,3 +164,80 @@ def write_to_google_sheets(
         return "Error: Export timed out after 60s"
     except Exception as e:
         return f"Error: {e}"
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# AI Lead Enrichment & Outreach Drafts
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ENRICH_PROMPT = """You are a B2B sales intelligence analyst. Given the following lead data extracted from a social platform, provide:
+
+1. **Estimated Company/Industry**: Based on their bio, post content, and profile, estimate what company or industry they work in.
+2. **Lead Quality Assessment**: Rate as Hot/Warm/Cold with a one-line reason.
+3. **Personalized Outreach Draft**: Write a short, natural cold outreach message (3-4 sentences) that references their specific post/interest. Don't be salesy. Be helpful and relevant.
+
+Respond in this exact JSON format (no markdown, no code fences):
+{"company_estimate": "...", "industry": "...", "quality": "Hot|Warm|Cold", "quality_reason": "...", "outreach_draft": "..."}
+
+Lead Data:
+- Username: {username}
+- Bio: {bio}
+- Post Type: {post_type}
+- Content Topic: {topic}
+- Upvotes: {upvotes}
+- Source: {source}"""
+
+
+def enrich_lead(lead: dict, google_api_key: str) -> dict:
+    """Enrich a single lead with AI-generated company estimate and outreach draft."""
+    try:
+        client = genai.Client(api_key=google_api_key)
+        prompt = ENRICH_PROMPT.format(
+            username=lead.get("Username", "Unknown"),
+            bio=lead.get("Bio", "N/A"),
+            post_type=lead.get("Post Type", "N/A"),
+            topic=lead.get("Content Topic", lead.get("Bio", "N/A")),
+            upvotes=lead.get("Upvotes", 0),
+            source=lead.get("Source", "Unknown"),
+        )
+        response = client.models.generate_content(
+            model=DEFAULT_MODEL, contents=prompt,
+        )
+        text = response.text.strip()
+        # Strip markdown code fences if present
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+            if text.endswith("```"):
+                text = text[:-3]
+            text = text.strip()
+        enrichment = json.loads(text)
+        return {
+            "Company (Est.)": enrichment.get("company_estimate", "Unknown"),
+            "Industry": enrichment.get("industry", "Unknown"),
+            "AI Quality": enrichment.get("quality", "Unknown"),
+            "Quality Reason": enrichment.get("quality_reason", ""),
+            "Outreach Draft": enrichment.get("outreach_draft", ""),
+        }
+    except Exception:
+        return {
+            "Company (Est.)": "—",
+            "Industry": "—",
+            "AI Quality": "—",
+            "Quality Reason": "Enrichment failed",
+            "Outreach Draft": "",
+        }
+
+
+def enrich_leads_batch(leads_df, google_api_key: str, progress_callback=None):
+    """Enrich all leads in a dataframe. Returns enriched dataframe."""
+    enrichments = []
+    total = len(leads_df)
+    for i, (_, row) in enumerate(leads_df.iterrows()):
+        lead_dict = row.to_dict()
+        enrichment = enrich_lead(lead_dict, google_api_key)
+        enrichments.append(enrichment)
+        if progress_callback:
+            progress_callback(i + 1, total)
+    import pandas as pd
+    enrich_df = pd.DataFrame(enrichments)
+    return pd.concat([leads_df.reset_index(drop=True), enrich_df], axis=1)
