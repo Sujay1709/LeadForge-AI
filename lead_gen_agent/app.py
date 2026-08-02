@@ -275,6 +275,144 @@ st.markdown("""
     .enrich-cold { background: rgba(74,158,255,0.15); color: #4a9eff; }
 
     hr { border-color: #1a1a1a !important; }
+
+    /* ━━━━━━ Landing Page Styles ━━━━━━ */
+    .landing-nav {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 18px 48px; position: fixed; top: 0; left: 0; right: 0;
+        z-index: 9999; background: rgba(10,10,10,0.85);
+        backdrop-filter: blur(20px); border-bottom: 1px solid #1a1a1a;
+    }
+    .landing-nav-logo {
+        font-size: 1.4rem; font-weight: 900; color: #fff;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .landing-nav-logo .dot { color: #4a9eff; }
+    .landing-nav-links { display: flex; align-items: center; gap: 32px; }
+    .landing-nav-links a {
+        color: #999; text-decoration: none; font-size: 0.88rem;
+        font-weight: 500; transition: color 0.2s;
+    }
+    .landing-nav-links a:hover { color: #fff; }
+    .landing-nav-cta {
+        padding: 10px 24px; border-radius: 8px; font-weight: 600;
+        font-size: 0.88rem; text-decoration: none; transition: all 0.2s;
+    }
+    .nav-signin { color: #ccc !important; }
+    .nav-trial {
+        background: #4a9eff !important; color: #fff !important;
+        border: none;
+    }
+    .nav-trial:hover { background: #3b8de8 !important; transform: translateY(-1px); }
+
+    .landing-hero {
+        text-align: center; padding: 160px 20px 80px;
+        background: radial-gradient(ellipse at 50% 0%, rgba(74,158,255,0.08) 0%, transparent 60%);
+    }
+    .landing-badge {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 8px 20px; border-radius: 24px;
+        border: 1px solid rgba(74,158,255,0.25); color: #4a9eff;
+        font-size: 0.82rem; font-weight: 500; margin-bottom: 32px;
+    }
+    .landing-h1 {
+        font-size: 4rem; font-weight: 900; color: #fff;
+        line-height: 1.1; margin-bottom: 24px; letter-spacing: -0.03em;
+    }
+    .landing-h1 .highlight { color: #4a9eff; }
+    .landing-sub {
+        font-size: 1.15rem; color: #777; max-width: 600px;
+        margin: 0 auto 48px; line-height: 1.7;
+    }
+    .landing-ctas {
+        display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;
+    }
+    .landing-ctas a, .landing-ctas button {
+        padding: 16px 36px; border-radius: 10px; font-size: 1rem;
+        font-weight: 600; text-decoration: none; transition: all 0.2s;
+        cursor: pointer; border: none;
+    }
+    .cta-primary {
+        background: #4a9eff; color: #fff !important;
+        box-shadow: 0 4px 20px rgba(74,158,255,0.25);
+    }
+    .cta-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(74,158,255,0.35); }
+    .cta-secondary {
+        background: transparent; color: #ccc !important;
+        border: 1px solid #333 !important;
+    }
+    .cta-secondary:hover { border-color: #555 !important; color: #fff !important; }
+
+    .landing-section {
+        padding: 80px 48px; max-width: 1200px; margin: 0 auto;
+    }
+    .landing-section-title {
+        font-size: 2.2rem; font-weight: 800; color: #fff;
+        text-align: center; margin-bottom: 12px;
+    }
+    .landing-section-sub {
+        font-size: 1rem; color: #666; text-align: center;
+        margin-bottom: 56px; max-width: 600px; margin-left: auto; margin-right: auto;
+    }
+
+    .feature-grid {
+        display: grid; grid-template-columns: repeat(3, 1fr);
+        gap: 24px; margin-bottom: 40px;
+    }
+    .feature-card {
+        background: #111; border: 1px solid #1a1a1a; border-radius: 16px;
+        padding: 32px; transition: all 0.25s;
+    }
+    .feature-card:hover { border-color: #4a9eff; transform: translateY(-4px); box-shadow: 0 8px 30px rgba(74,158,255,0.08); }
+    .feature-icon {
+        width: 48px; height: 48px; border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.5rem; margin-bottom: 20px;
+        background: rgba(74,158,255,0.1);
+    }
+    .feature-card h3 { font-size: 1.1rem; font-weight: 700; color: #eee; margin-bottom: 8px; }
+    .feature-card p { font-size: 0.88rem; color: #666; line-height: 1.6; }
+
+    .audience-grid {
+        display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
+    }
+    .audience-card {
+        background: #111; border: 1px solid #1a1a1a; border-radius: 14px;
+        padding: 28px 20px; text-align: center; transition: all 0.25s;
+    }
+    .audience-card:hover { border-color: #333; transform: translateY(-3px); }
+    .audience-icon { font-size: 2.2rem; margin-bottom: 14px; }
+    .audience-card h4 { font-size: 0.95rem; font-weight: 700; color: #ddd; margin-bottom: 6px; }
+    .audience-card p { font-size: 0.78rem; color: #555; line-height: 1.5; }
+
+    .creator-section {
+        display: flex; align-items: center; gap: 48px;
+        background: #111; border: 1px solid #1a1a1a; border-radius: 20px;
+        padding: 48px; margin: 0 auto; max-width: 800px;
+    }
+    .creator-avatar {
+        width: 100px; height: 100px; border-radius: 50%;
+        background: linear-gradient(135deg, #4a9eff, #00e676);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 2.5rem; flex-shrink: 0;
+    }
+    .creator-info h3 { font-size: 1.3rem; font-weight: 800; color: #eee; margin-bottom: 4px; }
+    .creator-info .role { font-size: 0.88rem; color: #4a9eff; font-weight: 600; margin-bottom: 12px; }
+    .creator-info p { font-size: 0.9rem; color: #777; line-height: 1.7; }
+
+    .landing-footer {
+        text-align: center; padding: 48px; border-top: 1px solid #1a1a1a;
+        color: #333; font-size: 0.78rem; margin-top: 40px;
+    }
+
+    @media (max-width: 768px) {
+        .landing-h1 { font-size: 2.5rem; }
+        .feature-grid { grid-template-columns: 1fr; }
+        .audience-grid { grid-template-columns: repeat(2, 1fr); }
+        .landing-nav { padding: 12px 20px; }
+        .landing-nav-links { display: none; }
+        .creator-section { flex-direction: column; text-align: center; }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -294,9 +432,168 @@ for key, default in {
     "pipeline": {},
     "pipeline_notes": {},
     "monitors": [],
+    "show_app": False,
+    "landing_section": "home",
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Landing Page
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+if not st.session_state.show_app:
+    st.markdown(
+        '<!-- NAV -->'
+        '<div class="landing-nav">'
+        '<div class="landing-nav-logo">⚡ LeadForge<span class="dot">.AI</span></div>'
+        '<div class="landing-nav-links">'
+        '<a href="#features">Product</a>'
+        '<a href="#features">Features</a>'
+        '<a href="#audience">Solutions</a>'
+        '<a href="#creator">About</a>'
+        '</div>'
+        '</div>',
+        unsafe_allow_html=True
+    )
+
+    # ── Hero ──
+    st.markdown(
+        '<div class="landing-hero">'
+        '<div class="landing-badge">⚡ The Complete AI Lead Discovery Platform</div>'
+        '<div class="landing-h1">Turn More Leads Into<br><span class="highlight">Customers</span></div>'
+        '<div class="landing-sub">'
+        'AI-powered lead discovery from Quora &amp; Pinterest. '
+        'Discover, score, enrich, and manage leads — all from one platform. '
+        'Built for startups, agencies, and growth teams.'
+        '</div>'
+        '</div>',
+        unsafe_allow_html=True
+    )
+
+    # CTA buttons
+    col_a, col_b, col_c = st.columns([2, 1, 2])
+    with col_b:
+        if st.button("⚡ Launch App", use_container_width=True):
+            st.session_state.show_app = True
+            st.rerun()
+
+    st.markdown("---")
+
+    # ── Features Section ──
+    st.markdown(
+        '<div id="features" class="landing-section">'
+        '<div class="landing-section-title">Powerful Features</div>'
+        '<div class="landing-section-sub">Everything you need to discover, qualify, and convert leads — powered by AI.</div>'
+        '<div class="feature-grid">'
+
+        '<div class="feature-card">'
+        '<div class="feature-icon">🔍</div>'
+        '<h3>AI-Powered Search</h3>'
+        '<p>Describe your ideal customer in plain English. Our AI transforms it into optimized queries and searches Quora &amp; Pinterest for matching leads.</p>'
+        '</div>'
+
+        '<div class="feature-card">'
+        '<div class="feature-icon">🧠</div>'
+        '<h3>Lead Enrichment</h3>'
+        '<p>One-click AI enrichment estimates company, industry, and lead quality. Get personalized outreach drafts generated by Gemini for every lead.</p>'
+        '</div>'
+
+        '<div class="feature-card">'
+        '<div class="feature-icon">🎯</div>'
+        '<h3>Kanban Pipeline</h3>'
+        '<p>Manage leads through Cold → Warm → Hot → Contacted → Converted stages. Add notes, move cards, and track your sales pipeline visually.</p>'
+        '</div>'
+
+        '<div class="feature-card">'
+        '<div class="feature-icon">📡</div>'
+        '<h3>Saved Monitors</h3>'
+        '<p>Save your best-performing searches as monitors. Re-run them instantly to discover fresh leads on the same topics over time.</p>'
+        '</div>'
+
+        '<div class="feature-card">'
+        '<div class="feature-icon">📊</div>'
+        '<h3>Smart Scoring</h3>'
+        '<p>Every lead is automatically scored 0–100 based on bio completeness, engagement signals, profile data, and source quality.</p>'
+        '</div>'
+
+        '<div class="feature-card">'
+        '<div class="feature-icon">📤</div>'
+        '<h3>Multi-Export</h3>'
+        '<p>Export to Google Sheets with one click via Composio, or download as CSV/JSON. Upload your own CSVs for instant AI scoring.</p>'
+        '</div>'
+
+        '</div></div>',
+        unsafe_allow_html=True
+    )
+
+    st.markdown("---")
+
+    # ── Who Is It For ──
+    st.markdown(
+        '<div id="audience" class="landing-section">'
+        '<div class="landing-section-title">Built For Growth Teams</div>'
+        '<div class="landing-section-sub">Whether you\'re a solo founder or a sales team, LeadForge AI finds your next customers.</div>'
+        '<div class="audience-grid">'
+
+        '<div class="audience-card">'
+        '<div class="audience-icon">🚀</div>'
+        '<h4>Startup Founders</h4>'
+        '<p>Find early adopters discussing your problem space on Q&amp;A platforms.</p>'
+        '</div>'
+
+        '<div class="audience-card">'
+        '<div class="audience-icon">📈</div>'
+        '<h4>Growth Marketers</h4>'
+        '<p>Discover high-intent users and craft personalized outreach at scale.</p>'
+        '</div>'
+
+        '<div class="audience-card">'
+        '<div class="audience-icon">🏢</div>'
+        '<h4>Sales Teams</h4>'
+        '<p>Build qualified pipelines from social signals instead of cold lists.</p>'
+        '</div>'
+
+        '<div class="audience-card">'
+        '<div class="audience-icon">🎨</div>'
+        '<h4>Agencies</h4>'
+        '<p>Source leads for clients across industries with AI-powered discovery.</p>'
+        '</div>'
+
+        '</div></div>',
+        unsafe_allow_html=True
+    )
+
+    st.markdown("---")
+
+    # ── Creator Section ──
+    st.markdown(
+        '<div id="creator" class="landing-section">'
+        '<div class="landing-section-title">Meet the Creator</div>'
+        '<div class="landing-section-sub"></div>'
+        '<div class="creator-section">'
+        '<div class="creator-avatar">SG</div>'
+        '<div class="creator-info">'
+        '<h3>Sujay Gopal</h3>'
+        '<div class="role">Builder &amp; Developer</div>'
+        '<p>LeadForge AI was built to solve the #1 problem for startups: finding qualified leads without expensive tools. '
+        'It combines Firecrawl for web intelligence, Google Gemini for AI analysis, and Composio for seamless exports — '
+        'creating an end-to-end lead discovery engine that anyone can use.</p>'
+        '</div>'
+        '</div></div>',
+        unsafe_allow_html=True
+    )
+
+    # ── Footer ──
+    st.markdown(
+        '<div class="landing-footer">'
+        'LeadForge AI · Built with Streamlit · Firecrawl · Gemini · Composio<br>'
+        '© 2026 Sujay Gopal. All rights reserved.'
+        '</div>',
+        unsafe_allow_html=True
+    )
+
+    st.stop()
+
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Load API keys
