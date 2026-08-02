@@ -160,8 +160,8 @@ st.markdown("""
         color: #eee !important; border-radius: 10px !important;
     }
 
-    /* ── Generate button ── */
-    .stButton > button {
+    /* ── Primary action buttons (Generate, Enrich, etc.) ── */
+    .stButton > button[kind="primary"] {
         background: linear-gradient(135deg, #c6ff00, #76ff03) !important;
         color: #000 !important; font-weight: 700 !important;
         border: none !important; border-radius: 12px !important;
@@ -170,14 +170,35 @@ st.markdown("""
         box-shadow: 0 2px 8px rgba(198,255,0,0.15) !important;
         position: relative; overflow: hidden;
     }
-    .stButton > button:hover {
+    .stButton > button[kind="primary"]:hover {
         transform: translateY(-2px) scale(1.02) !important;
         box-shadow: 0 6px 20px rgba(198,255,0,0.3) !important;
     }
-    .stButton > button:active {
+    .stButton > button[kind="primary"]:active {
         transform: translateY(1px) scale(0.96) !important;
         box-shadow: 0 1px 4px rgba(198,255,0,0.15) !important;
         transition: all 0.06s !important;
+    }
+
+    /* ── Secondary / Nav buttons ── */
+    .stButton > button[kind="secondary"],
+    .stButton > button:not([kind="primary"]):not([kind]) {
+        background: #111 !important; border: 1px solid #1a1a1a !important;
+        color: #888 !important; font-weight: 600 !important;
+        border-radius: 8px !important; font-size: 0.78rem !important;
+        padding: 0.45rem 1rem !important;
+        box-shadow: none !important;
+        transition: all 0.15s cubic-bezier(.4,0,.2,1) !important;
+    }
+    .stButton > button[kind="secondary"]:hover,
+    .stButton > button:not([kind="primary"]):not([kind]):hover {
+        border-color: #c6ff00 !important; color: #c6ff00 !important;
+        background: #151515 !important;
+        transform: translateY(-1px) !important;
+    }
+    .stButton > button[kind="secondary"]:active,
+    .stButton > button:not([kind="primary"]):not([kind]):active {
+        transform: scale(0.97) !important;
     }
 
     /* ── Download buttons ── */
@@ -216,17 +237,6 @@ st.markdown("""
 
     /* ── Toggle ── */
     .stToggle label span { transition: all 0.2s !important; }
-
-    /* ── Tabs ── */
-    .stTabs [data-baseweb="tab-list"] { gap: 6px; background: transparent; }
-    .stTabs [data-baseweb="tab"] {
-        background: #111; border: 1px solid #1a1a1a; border-radius: 8px;
-        color: #666; padding: 8px 18px;
-        transition: all 0.15s cubic-bezier(.4,0,.2,1) !important;
-    }
-    .stTabs [data-baseweb="tab"]:hover { color: #bbb; border-color: #333; }
-    .stTabs [data-baseweb="tab"]:active { transform: scale(0.97); }
-    .stTabs [aria-selected="true"] { background: #151515 !important; border-color: #c6ff00 !important; color: #c6ff00 !important; }
 
     /* ── File uploader ── */
     .stFileUploader > div { border-radius: 12px !important; }
@@ -434,6 +444,7 @@ for key, default in {
     "monitors": [],
     "show_app": False,
     "landing_section": "home",
+    "active_tab": None,
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -473,7 +484,7 @@ if not st.session_state.show_app:
     # CTA buttons
     col_a, col_b, col_c = st.columns([2, 1, 2])
     with col_b:
-        if st.button("⚡ Launch App", use_container_width=True):
+        if st.button("⚡ Launch App", use_container_width=True, type="primary"):
             st.session_state.show_app = True
             st.rerun()
 
@@ -712,13 +723,31 @@ with st.sidebar:
 # Main Content Area
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# Header
-st.markdown(
-    '<div class="main-header">'
-    '<div class="main-title">⚡ LeadForge AI</div>'
-    '<div style="font-size:0.75rem;color:#555;">AI-powered lead discovery from Quora & Pinterest</div>'
-    '</div>', unsafe_allow_html=True
-)
+# Header + Top-right navigation
+col_title, col_nav = st.columns([2, 3])
+with col_title:
+    st.markdown(
+        '<div style="padding:8px 0 16px;">'
+        '<div class="main-title">⚡ LeadForge AI</div>'
+        '<div style="font-size:0.75rem;color:#555;">AI-powered lead discovery from Quora & Pinterest</div>'
+        '</div>', unsafe_allow_html=True
+    )
+with col_nav:
+    nav_cols = st.columns(5)
+    nav_items = [
+        ("🔍 AI Search", "search"),
+        ("📤 Bulk Upload", "bulk"),
+        ("🎯 Pipeline", "pipeline"),
+        ("📡 Monitors", "monitors"),
+        ("📊 Results", "results"),
+    ]
+    for i, (label, key) in enumerate(nav_items):
+        with nav_cols[i]:
+            if st.button(label, key=f"nav_{key}", use_container_width=True):
+                st.session_state.active_tab = key
+                st.rerun()
+
+active_tab = st.session_state.active_tab
 
 # Metrics row
 st.markdown(
@@ -730,16 +759,53 @@ st.markdown(
     '</div>', unsafe_allow_html=True
 )
 
+# Firecrawl credit check
+if firecrawl_key:
+    try:
+        _credit_resp = requests.get(
+            "https://api.firecrawl.dev/v1/account",
+            headers={"Authorization": f"Bearer {firecrawl_key}"},
+            timeout=5,
+        )
+        if _credit_resp.status_code == 200:
+            _credit_data = _credit_resp.json()
+            _remaining = _credit_data.get("remaining_credits", _credit_data.get("credits"))
+            if _remaining is not None:
+                _ccolor = "#c6ff00" if _remaining > 10 else "#ffab00" if _remaining > 0 else "#ff5252"
+                st.markdown(
+                    f'<div style="text-align:right;font-size:0.72rem;color:{_ccolor};margin:-4px 0 8px;">'
+                    f'🔥 Firecrawl credits: {_remaining} remaining</div>',
+                    unsafe_allow_html=True
+                )
+        elif _credit_resp.status_code == 402:
+            st.markdown(
+                '<div class="error-banner">🔥 Firecrawl credits exhausted — '
+                '<a href="https://www.firecrawl.dev/app/api-keys" style="color:#c6ff00;">add credits</a></div>',
+                unsafe_allow_html=True
+            )
+    except Exception:
+        pass
+
 st.markdown("---")
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Tabs
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-tab_search, tab_bulk, tab_pipeline, tab_monitors, tab_results = st.tabs(["🔍 AI Search", "📤 Bulk Upload", "🎯 Pipeline", "📡 Monitors", "📊 Results"])
+# ── Default: Welcome Dashboard ────────────────────────
+if active_tab is None:
+    st.markdown(
+        '<div style="text-align:center;padding:80px 0;">'
+        '<div style="font-size:3.5rem;margin-bottom:16px;">⚡</div>'
+        '<div style="font-size:1.5rem;font-weight:800;color:#eee;margin-bottom:8px;">Welcome to LeadForge AI</div>'
+        '<div style="font-size:0.9rem;color:#555;max-width:500px;margin:0 auto 32px;line-height:1.7;">'
+        'Select a section from the navigation above to get started. '
+        'Use <strong style="color:#c6ff00;">AI Search</strong> to discover leads, '
+        '<strong style="color:#c6ff00;">Bulk Upload</strong> to score CSVs, or '
+        '<strong style="color:#c6ff00;">Pipeline</strong> to manage your funnel.'
+        '</div>'
+        '</div>', unsafe_allow_html=True
+    )
 
 
-# ── Tab 1: AI Search ────────────────────────
-with tab_search:
+# ── Section: AI Search ────────────────────────
+if active_tab == "search":
     # Re-run from history
     if st.session_state.search_history:
         history_labels = ["New search..."] + [
@@ -760,7 +826,7 @@ with tab_search:
         )
     with col_go:
         st.markdown("<br>", unsafe_allow_html=True)
-        run_search = st.button("⚡ Generate", use_container_width=True)
+        run_search = st.button("⚡ Generate", use_container_width=True, type="primary")
 
     # Source indicator
     if selected_sources:
@@ -917,7 +983,7 @@ with tab_search:
             st.markdown("---")
             col_enrich, col_pipeline = st.columns(2)
             with col_enrich:
-                if st.button("🧠 AI Enrich Leads", use_container_width=True, help="Add company estimates & outreach drafts via Gemini"):
+                if st.button("🧠 AI Enrich Leads", use_container_width=True, type="primary", help="Add company estimates & outreach drafts via Gemini"):
                     with st.status("🧠 Enriching leads with AI...", expanded=True) as s:
                         progress_bar = st.progress(0)
                         def update_progress(current, total):
@@ -929,7 +995,7 @@ with tab_search:
                         s.update(label=f"✅ Enriched {len(enriched)} leads", state="complete")
                     st.rerun()
             with col_pipeline:
-                if st.button("🎯 Send to Pipeline", use_container_width=True, help="Add leads to the Kanban pipeline"):
+                if st.button("🎯 Send to Pipeline", use_container_width=True, type="primary", help="Add leads to the Kanban pipeline"):
                     for _, row in df.iterrows():
                         lead_id = f"{row.get('Username', 'unknown')}_{row.get('Source', 'unknown')}"
                         if lead_id not in st.session_state.pipeline:
@@ -966,8 +1032,8 @@ with tab_search:
             st.markdown(f'<div class="error-banner">Something went wrong: {error_msg}</div>', unsafe_allow_html=True)
 
 
-# ── Tab 2: Bulk Upload ────────────────────────
-with tab_bulk:
+# ── Section: Bulk Upload ────────────────────────
+if active_tab == "bulk":
     st.markdown("### Upload CSV for Instant Scoring")
     st.markdown(
         '<div style="color:#666;font-size:0.85rem;margin-bottom:1rem;">'
@@ -1053,8 +1119,8 @@ with tab_bulk:
         st.download_button("📥 Download Scored CSV", df_scored.to_csv(index=False), "leadforge_scored.csv", "text/csv")
 
 
-# ── Tab 3: Pipeline (Kanban) ────────────────────
-with tab_pipeline:
+# ── Section: Pipeline (Kanban) ────────────────────
+if active_tab == "pipeline":
     st.markdown("### Lead Pipeline")
 
     if not st.session_state.pipeline:
@@ -1131,14 +1197,14 @@ with tab_pipeline:
         if pipeline_leads:
             selected_lead = st.selectbox("Select lead", pipeline_leads, format_func=lambda x: x.split("_")[0], label_visibility="collapsed")
             note_text = st.text_input("Note", value=st.session_state.pipeline_notes.get(selected_lead, ""), label_visibility="collapsed", placeholder="Add a note about this lead...")
-            if st.button("💾 Save Note"):
+            if st.button("💾 Save Note", type="primary"):
                 st.session_state.pipeline_notes[selected_lead] = note_text
                 st.success("Note saved")
                 st.rerun()
 
 
-# ── Tab 4: Monitors ────────────────────────────
-with tab_monitors:
+# ── Section: Monitors ────────────────────────────
+if active_tab == "monitors":
     st.markdown("### Saved Search Monitors")
     st.markdown(
         '<div style="color:#666;font-size:0.85rem;margin-bottom:1rem;">'
@@ -1153,7 +1219,7 @@ with tab_monitors:
         selected_monitor = st.selectbox("Pick a recent search to save:", monitor_options, label_visibility="collapsed")
         monitor_name = st.text_input("Monitor name", value=selected_monitor[:40] if selected_monitor else "", label_visibility="collapsed", placeholder="Name this monitor...")
 
-        if st.button("📡 Save as Monitor", use_container_width=True):
+        if st.button("📡 Save as Monitor", use_container_width=True, type="primary"):
             # Find the matching search history entry
             matching = [h for h in st.session_state.search_history if h["query"][:60] == selected_monitor]
             if matching:
@@ -1194,7 +1260,7 @@ with tab_monitors:
 
             col_run, col_del = st.columns([3, 1])
             with col_run:
-                if st.button(f"▶ Re-run", key=f"run_monitor_{i}", use_container_width=True):
+                if st.button(f"▶ Re-run", key=f"run_monitor_{i}", use_container_width=True, type="primary"):
                     st.session_state.active_search = monitor["query"]
                     monitor["runs"] += 1
                     monitor["last_run"] = datetime.now().strftime("%b %d, %I:%M %p")
@@ -1213,8 +1279,8 @@ with tab_monitors:
         )
 
 
-# ── Tab 5: Results ────────────────────────────
-with tab_results:
+# ── Section: Results ────────────────────────────
+if active_tab == "results":
     if st.session_state.leads_df is not None and not st.session_state.leads_df.empty:
         df = st.session_state.leads_df
         st.markdown("### Lead Intelligence Dashboard")
@@ -1261,7 +1327,7 @@ with tab_results:
     else:
         st.markdown(
             '<div style="text-align:center;padding:80px 0;color:#333;">'
-            '<div style="font-size:3rem;margin-bottom:12px;">📊</div>'
+            '<div style="font-size:3rem;margin-bottom:12px;">🌊</div>'
             '<div style="font-size:1.1rem;color:#555;">No leads yet</div>'
             '<div style="font-size:0.82rem;color:#333;">Run an AI search or upload a CSV to get started</div>'
             '</div>', unsafe_allow_html=True
