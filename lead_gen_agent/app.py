@@ -502,7 +502,7 @@ with tab_search:
                 client = create_prompt_transform_agent(google_key)
                 company_description = transform_query(client, user_query)
                 st.write(f'Query → **"{company_description}"**')
-                s.update(label=f"✅ Query → "{company_description}"', state="complete")
+                s.update(label=f'✅ Query → "{company_description}"', state="complete")
 
             # Step 1.5 — Web Research
             research_context = ""
