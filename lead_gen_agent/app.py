@@ -12,10 +12,13 @@ from datetime import datetime
 
 from config import (
     get_api_keys, get_validated_keys, DEFAULT_NUM_LINKS, DEFAULT_MODEL,
-    AVAILABLE_SOURCES, search_limiter,
+    AVAILABLE_SOURCES, search_limiter, PIPELINE_STAGES, PIPELINE_COLORS,
 )
 from scraper import search_for_urls, extract_user_info_from_urls, format_leads_to_flat_json
-from agents import create_prompt_transform_agent, transform_query, write_to_google_sheets
+from agents import (
+    create_prompt_transform_agent, transform_query, write_to_google_sheets,
+    enrich_leads_batch,
+)
 from tools import research_topic
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -262,6 +265,15 @@ st.markdown("""
     .api-desc { font-size: 0.68rem; color: #555; line-height: 1.4; margin-top: 3px; }
     .api-status { font-size: 0.65rem; font-weight: 600; margin-top: 5px; }
 
+    /* ── Enrichment badge ── */
+    .enrich-badge {
+        display: inline-block; padding: 2px 8px; border-radius: 6px;
+        font-size: 0.65rem; font-weight: 600;
+    }
+    .enrich-hot { background: rgba(255,82,82,0.15); color: #ff5252; }
+    .enrich-warm { background: rgba(255,171,0,0.15); color: #ffab00; }
+    .enrich-cold { background: rgba(74,158,255,0.15); color: #4a9eff; }
+
     hr { border-color: #1a1a1a !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -278,6 +290,10 @@ for key, default in {
     "sheet_url": None,
     "pinned_searches": [],
     "active_search": None,
+    "enriched_df": None,
+    "pipeline": {},
+    "pipeline_notes": {},
+    "monitors": [],
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -422,7 +438,7 @@ st.markdown("---")
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Tabs
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-tab_search, tab_bulk, tab_results = st.tabs(["🔍 AI Search", "📤 Bulk Upload", "📊 Results"])
+tab_search, tab_bulk, tab_pipeline, tab_monitors, tab_results = st.tabs(["🔍 AI Search", "📤 Bulk Upload", "🎯 Pipeline", "📡 Monitors", "📊 Results"])
 
 
 # ── Tab 1: AI Search ────────────────────────
@@ -486,7 +502,7 @@ with tab_search:
                 client = create_prompt_transform_agent(google_key)
                 company_description = transform_query(client, user_query)
                 st.write(f'Query → **"{company_description}"**')
-                s.update(label=f'✅ Query → "{company_description}"', state="complete")
+                s.update(label=f"✅ Query → "{company_description}"', state="complete")
 
             # Step 1.5 — Web Research
             research_context = ""
@@ -600,6 +616,39 @@ with tab_search:
             if st.session_state.sheet_url and not st.session_state.sheet_url.startswith("Error"):
                 st.markdown(f"📊 **[Open Google Sheet]({st.session_state.sheet_url})**")
 
+            # ── AI Enrichment ──
+            st.markdown("---")
+            col_enrich, col_pipeline = st.columns(2)
+            with col_enrich:
+                if st.button("🧠 AI Enrich Leads", use_container_width=True, help="Add company estimates & outreach drafts via Gemini"):
+                    with st.status("🧠 Enriching leads with AI...", expanded=True) as s:
+                        progress_bar = st.progress(0)
+                        def update_progress(current, total):
+                            progress_bar.progress(current / total)
+                            s.update(label=f"🧠 Enriching lead {current}/{total}...")
+                        enriched = enrich_leads_batch(df, google_key, progress_callback=update_progress)
+                        st.session_state.enriched_df = enriched
+                        st.session_state.leads_df = enriched
+                        s.update(label=f"✅ Enriched {len(enriched)} leads", state="complete")
+                    st.rerun()
+            with col_pipeline:
+                if st.button("🎯 Send to Pipeline", use_container_width=True, help="Add leads to the Kanban pipeline"):
+                    for _, row in df.iterrows():
+                        lead_id = f"{row.get('Username', 'unknown')}_{row.get('Source', 'unknown')}"
+                        if lead_id not in st.session_state.pipeline:
+                            score = int(row.get("Lead Score", 0))
+                            if score >= 70:
+                                stage = "Hot"
+                            elif score >= 40:
+                                stage = "Warm"
+                            else:
+                                stage = "Cold"
+                            st.session_state.pipeline[lead_id] = {
+                                "stage": stage,
+                                "data": row.to_dict(),
+                            }
+                    st.success(f"Added {len(df)} leads to pipeline")
+
         except requests.exceptions.HTTPError as e:
             if e.response is not None and e.response.status_code == 402:
                 st.markdown(
@@ -707,7 +756,167 @@ with tab_bulk:
         st.download_button("📥 Download Scored CSV", df_scored.to_csv(index=False), "leadforge_scored.csv", "text/csv")
 
 
-# ── Tab 3: Results ────────────────────────────
+# ── Tab 3: Pipeline (Kanban) ────────────────────
+with tab_pipeline:
+    st.markdown("### Lead Pipeline")
+
+    if not st.session_state.pipeline:
+        st.markdown(
+            '<div style="text-align:center;padding:60px 0;color:#333;">'
+            '<div style="font-size:3rem;margin-bottom:12px;">🎯</div>'
+            '<div style="font-size:1.1rem;color:#555;">Pipeline is empty</div>'
+            '<div style="font-size:0.82rem;color:#333;">Run a search and click "Send to Pipeline" to populate</div>'
+            '</div>', unsafe_allow_html=True
+        )
+    else:
+        # Pipeline stats
+        stage_counts = {}
+        for stage in PIPELINE_STAGES:
+            stage_counts[stage] = sum(1 for v in st.session_state.pipeline.values() if v["stage"] == stage)
+
+        cols = st.columns(len(PIPELINE_STAGES))
+        for i, stage in enumerate(PIPELINE_STAGES):
+            color = PIPELINE_COLORS[stage]
+            cols[i].markdown(
+                f'<div style="text-align:center;padding:12px;background:#111;border:1px solid {color};'
+                f'border-radius:10px;margin-bottom:8px;">'
+                f'<div style="font-size:1.5rem;font-weight:800;color:{color};">{stage_counts[stage]}</div>'
+                f'<div style="font-size:0.7rem;color:#888;text-transform:uppercase;">{stage}</div>'
+                f'</div>', unsafe_allow_html=True
+            )
+
+        st.markdown("---")
+
+        # Kanban columns
+        kanban_cols = st.columns(len(PIPELINE_STAGES))
+        for col_idx, stage in enumerate(PIPELINE_STAGES):
+            with kanban_cols[col_idx]:
+                color = PIPELINE_COLORS[stage]
+                st.markdown(
+                    f'<div style="font-size:0.75rem;font-weight:700;color:{color};'
+                    f'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;'
+                    f'border-bottom:2px solid {color};padding-bottom:6px;">'
+                    f'{stage} ({stage_counts[stage]})</div>', unsafe_allow_html=True
+                )
+                leads_in_stage = {k: v for k, v in st.session_state.pipeline.items() if v["stage"] == stage}
+                for lead_id, lead_info in list(leads_in_stage.items())[:10]:
+                    data = lead_info["data"]
+                    username = str(data.get("Username", "Unknown"))[:20]
+                    score = data.get("Lead Score", "?")
+                    source = str(data.get("Source", ""))[:8]
+                    note = st.session_state.pipeline_notes.get(lead_id, "")
+
+                    st.markdown(
+                        f'<div style="background:#111;border:1px solid #1a1a1a;border-radius:8px;'
+                        f'padding:10px;margin-bottom:6px;font-size:0.75rem;">'
+                        f'<div style="font-weight:600;color:#ddd;">{username}</div>'
+                        f'<div style="color:#666;font-size:0.65rem;">{source} · Score: {score}</div>'
+                        f'{"<div style=color:#c6ff00;font-size:0.62rem;margin-top:3px;>📝 " + note[:40] + "</div>" if note else ""}'
+                        f'</div>', unsafe_allow_html=True
+                    )
+
+                    # Move buttons
+                    stage_idx = PIPELINE_STAGES.index(stage)
+                    bcol1, bcol2 = st.columns(2)
+                    if stage_idx > 0:
+                        if bcol1.button("◀", key=f"mv_left_{lead_id}", help=f"Move to {PIPELINE_STAGES[stage_idx-1]}"):
+                            st.session_state.pipeline[lead_id]["stage"] = PIPELINE_STAGES[stage_idx - 1]
+                            st.rerun()
+                    if stage_idx < len(PIPELINE_STAGES) - 1:
+                        if bcol2.button("▶", key=f"mv_right_{lead_id}", help=f"Move to {PIPELINE_STAGES[stage_idx+1]}"):
+                            st.session_state.pipeline[lead_id]["stage"] = PIPELINE_STAGES[stage_idx + 1]
+                            st.rerun()
+
+        # Notes section
+        st.markdown("---")
+        st.markdown("#### Add Note to Lead")
+        pipeline_leads = list(st.session_state.pipeline.keys())
+        if pipeline_leads:
+            selected_lead = st.selectbox("Select lead", pipeline_leads, format_func=lambda x: x.split("_")[0], label_visibility="collapsed")
+            note_text = st.text_input("Note", value=st.session_state.pipeline_notes.get(selected_lead, ""), label_visibility="collapsed", placeholder="Add a note about this lead...")
+            if st.button("💾 Save Note"):
+                st.session_state.pipeline_notes[selected_lead] = note_text
+                st.success("Note saved")
+                st.rerun()
+
+
+# ── Tab 4: Monitors ────────────────────────────
+with tab_monitors:
+    st.markdown("### Saved Search Monitors")
+    st.markdown(
+        '<div style="color:#666;font-size:0.85rem;margin-bottom:1rem;">'
+        'Save your searches to quickly re-run them. Monitors track your lead discovery patterns.'
+        '</div>', unsafe_allow_html=True
+    )
+
+    # Save current search as monitor
+    if st.session_state.search_history:
+        st.markdown("#### Save a Search as Monitor")
+        monitor_options = [f"{h['query'][:60]}" for h in st.session_state.search_history[-10:]]
+        selected_monitor = st.selectbox("Pick a recent search to save:", monitor_options, label_visibility="collapsed")
+        monitor_name = st.text_input("Monitor name", value=selected_monitor[:40] if selected_monitor else "", label_visibility="collapsed", placeholder="Name this monitor...")
+
+        if st.button("📡 Save as Monitor", use_container_width=True):
+            # Find the matching search history entry
+            matching = [h for h in st.session_state.search_history if h["query"][:60] == selected_monitor]
+            if matching:
+                monitor = {
+                    "name": monitor_name or selected_monitor[:40],
+                    "query": matching[-1]["query"],
+                    "sources": matching[-1].get("sources", ["quora"]),
+                    "created": datetime.now().strftime("%b %d, %I:%M %p"),
+                    "last_run": matching[-1].get("time", "Never"),
+                    "total_leads": matching[-1].get("leads", 0),
+                    "runs": 1,
+                }
+                st.session_state.monitors.append(monitor)
+                st.success(f"Monitor '{monitor_name}' saved!")
+                st.rerun()
+
+    st.markdown("---")
+
+    # Display saved monitors
+    if st.session_state.monitors:
+        st.markdown("#### Active Monitors")
+        for i, monitor in enumerate(st.session_state.monitors):
+            sources_str = ", ".join(monitor.get("sources", ["quora"]))
+            st.markdown(
+                f'<div style="background:#111;border:1px solid #1a1a1a;border-radius:10px;'
+                f'padding:14px;margin-bottom:8px;">'
+                f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                f'<div>'
+                f'<div style="font-size:0.9rem;font-weight:700;color:#eee;">📡 {monitor["name"]}</div>'
+                f'<div style="font-size:0.72rem;color:#666;margin-top:3px;">'
+                f'{sources_str} · {monitor["total_leads"]} leads · {monitor["runs"]} runs</div>'
+                f'</div>'
+                f'<div style="text-align:right;">'
+                f'<div style="font-size:0.65rem;color:#555;">Created: {monitor["created"]}</div>'
+                f'<div style="font-size:0.65rem;color:#c6ff00;">Last: {monitor["last_run"]}</div>'
+                f'</div></div></div>', unsafe_allow_html=True
+            )
+
+            col_run, col_del = st.columns([3, 1])
+            with col_run:
+                if st.button(f"▶ Re-run", key=f"run_monitor_{i}", use_container_width=True):
+                    st.session_state.active_search = monitor["query"]
+                    monitor["runs"] += 1
+                    monitor["last_run"] = datetime.now().strftime("%b %d, %I:%M %p")
+                    st.info(f"Go to AI Search tab — query pre-filled with: {monitor['query'][:50]}")
+            with col_del:
+                if st.button("🗑", key=f"del_monitor_{i}"):
+                    st.session_state.monitors.pop(i)
+                    st.rerun()
+    else:
+        st.markdown(
+            '<div style="text-align:center;padding:60px 0;color:#333;">'
+            '<div style="font-size:3rem;margin-bottom:12px;">📡</div>'
+            '<div style="font-size:1.1rem;color:#555;">No monitors yet</div>'
+            '<div style="font-size:0.82rem;color:#333;">Run a search first, then save it as a monitor here</div>'
+            '</div>', unsafe_allow_html=True
+        )
+
+
+# ── Tab 5: Results ────────────────────────────
 with tab_results:
     if st.session_state.leads_df is not None and not st.session_state.leads_df.empty:
         df = st.session_state.leads_df
