@@ -119,3 +119,13 @@ AVAILABLE_SOURCES = {
     "quora": {"label": "Quora", "icon": "🔶", "description": "Q&A discussions"},
     "pinterest": {"label": "Pinterest", "icon": "📌", "description": "Visual inspiration & templates"},
 }
+
+# Pipeline stages for Kanban board
+PIPELINE_STAGES = ["Cold", "Warm", "Hot", "Contacted", "Converted"]
+PIPELINE_COLORS = {
+    "Cold": "#4a9eff",
+    "Warm": "#ffab00",
+    "Hot": "#ff5252",
+    "Contacted": "#c6ff00",
+    "Converted": "#00e676",
+}
