@@ -39,7 +39,11 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
     /* ── Global ── */
-    .stApp { background: #0a0a0a; font-family: 'Inter', sans-serif; }
+    .stApp {
+        background: #060606;
+        background-image: radial-gradient(ellipse at 50% 0%, rgba(198,255,0,0.015) 0%, transparent 55%);
+        font-family: 'Inter', sans-serif;
+    }
     header[data-testid="stHeader"] { background: transparent; }
     #MainMenu, footer { visibility: hidden; }
     * { -webkit-tap-highlight-color: transparent; }
@@ -180,25 +184,33 @@ st.markdown("""
         transition: all 0.06s !important;
     }
 
-    /* ── Secondary / Nav buttons ── */
+    /* ── Minimalist Nav Tabs (freebuff-inspired) ── */
     .stButton > button[kind="secondary"],
     .stButton > button:not([kind="primary"]):not([kind]) {
-        background: #111 !important; border: 1px solid #1a1a1a !important;
-        color: #888 !important; font-weight: 600 !important;
-        border-radius: 8px !important; font-size: 0.78rem !important;
-        padding: 0.45rem 1rem !important;
+        background: rgba(255,255,255,0.03) !important;
+        border: 1px solid rgba(255,255,255,0.08) !important;
+        color: #999 !important; font-weight: 500 !important;
+        border-radius: 10px !important; font-size: 0.82rem !important;
+        padding: 12px 8px !important;
         box-shadow: none !important;
-        transition: all 0.15s cubic-bezier(.4,0,.2,1) !important;
+        backdrop-filter: blur(12px) !important;
+        transition: all 0.25s cubic-bezier(.4,0,.2,1) !important;
+        letter-spacing: 0.01em;
+        position: relative; z-index: 10;
     }
     .stButton > button[kind="secondary"]:hover,
     .stButton > button:not([kind="primary"]):not([kind]):hover {
-        border-color: #c6ff00 !important; color: #c6ff00 !important;
-        background: #151515 !important;
-        transform: translateY(-1px) !important;
+        color: #fff !important;
+        background: rgba(255,255,255,0.07) !important;
+        border-color: rgba(255,255,255,0.18) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 20px rgba(198,255,0,0.06) !important;
     }
     .stButton > button[kind="secondary"]:active,
     .stButton > button:not([kind="primary"]):not([kind]):active {
-        transform: scale(0.97) !important;
+        transform: scale(0.96) translateY(0) !important;
+        background: rgba(255,255,255,0.10) !important;
+        transition: all 0.08s !important;
     }
 
     /* ── Download buttons ── */
@@ -422,6 +434,124 @@ st.markdown("""
         .landing-nav { padding: 12px 20px; }
         .landing-nav-links { display: none; }
         .creator-section { flex-direction: column; text-align: center; }
+    }
+
+    /* ━━━━━━ 3D Floating Particle System ━━━━━━ */
+    @keyframes float-up {
+        0%   { transform: translateY(0) translateX(0); }
+        25%  { transform: translateY(-28vh) translateX(18px); }
+        50%  { transform: translateY(-55vh) translateX(-12px); }
+        75%  { transform: translateY(-82vh) translateX(22px); }
+        100% { transform: translateY(-112vh) translateX(0); }
+    }
+    @keyframes float-drift {
+        0%   { transform: translateY(0) translateX(0) scale(1); }
+        33%  { transform: translateY(-38vh) translateX(-28px) scale(1.3); }
+        66%  { transform: translateY(-74vh) translateX(32px) scale(0.7); }
+        100% { transform: translateY(-112vh) translateX(-8px) scale(1); }
+    }
+    @keyframes glow-breathe {
+        0%, 100% { opacity: 0.4; transform: scale(1); }
+        50%      { opacity: 0.8; transform: scale(1.15); }
+    }
+
+    .particle-field {
+        position: fixed;
+        width: 2px; height: 2px;
+        top: 100vh; left: 0;
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 0;
+        box-shadow:
+            82px 0 0 0 rgba(198,255,0,0.18),
+            245px -30px 0 0 rgba(198,255,0,0.10),
+            420px -80px 0 0.5px rgba(255,255,255,0.08),
+            610px -20px 0 0 rgba(198,255,0,0.14),
+            790px -60px 0 0.5px rgba(198,255,0,0.06),
+            980px -40px 0 0 rgba(255,255,255,0.10),
+            1150px -10px 0 0.5px rgba(198,255,0,0.08),
+            1320px -70px 0 0 rgba(198,255,0,0.12),
+            150px -140px 0 0.5px rgba(255,255,255,0.06),
+            370px -200px 0 0 rgba(198,255,0,0.10),
+            550px -160px 0 0.5px rgba(198,255,0,0.08),
+            730px -230px 0 0 rgba(255,255,255,0.12),
+            910px -180px 0 0.5px rgba(198,255,0,0.06),
+            1090px -250px 0 0 rgba(198,255,0,0.10),
+            1270px -200px 0 0.5px rgba(255,255,255,0.08),
+            200px -320px 0 0 rgba(198,255,0,0.12),
+            480px -360px 0 0.5px rgba(255,255,255,0.06),
+            760px -340px 0 0 rgba(198,255,0,0.08),
+            1040px -380px 0 0.5px rgba(198,255,0,0.10),
+            1300px -350px 0 0 rgba(255,255,255,0.12);
+        animation: float-up 55s linear infinite;
+    }
+    .particle-field-2 {
+        width: 3px; height: 3px;
+        box-shadow:
+            130px -10px 0 0 rgba(198,255,0,0.10),
+            340px -90px 0 0.5px rgba(255,255,255,0.06),
+            530px -40px 0 0 rgba(198,255,0,0.14),
+            710px -120px 0 0.5px rgba(255,255,255,0.08),
+            890px -50px 0 0 rgba(198,255,0,0.08),
+            1070px -130px 0 0.5px rgba(198,255,0,0.06),
+            1250px -80px 0 0 rgba(255,255,255,0.10),
+            190px -190px 0 0.5px rgba(198,255,0,0.12),
+            460px -260px 0 0 rgba(255,255,255,0.06),
+            650px -210px 0 0.5px rgba(198,255,0,0.08),
+            830px -280px 0 0 rgba(198,255,0,0.10),
+            1010px -230px 0 0.5px rgba(255,255,255,0.08),
+            1200px -300px 0 0 rgba(198,255,0,0.06),
+            300px -400px 0 0.5px rgba(198,255,0,0.10),
+            580px -430px 0 0 rgba(255,255,255,0.12),
+            860px -410px 0 0.5px rgba(198,255,0,0.08),
+            1140px -450px 0 0 rgba(198,255,0,0.10);
+        animation: float-drift 38s linear infinite;
+    }
+
+    /* Ambient glow orb */
+    .ambient-glow {
+        position: fixed;
+        top: -15%; left: 30%;
+        width: 40vw; height: 40vw;
+        background: radial-gradient(ellipse, rgba(198,255,0,0.025) 0%, transparent 70%);
+        pointer-events: none;
+        z-index: 0;
+        animation: glow-breathe 8s ease-in-out infinite;
+    }
+
+    /* ━━━━━━ GitHub Badge ━━━━━━ */
+    .github-badge-row {
+        text-align: right; padding: 4px 0 0; position: relative; z-index: 10;
+    }
+    .github-badge {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 8px 20px; border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.08);
+        background: rgba(255,255,255,0.03);
+        color: #aaa !important; text-decoration: none !important;
+        font-size: 0.78rem; font-weight: 500;
+        transition: all 0.25s cubic-bezier(.4,0,.2,1);
+        backdrop-filter: blur(12px);
+    }
+    .github-badge:hover {
+        border-color: rgba(255,255,255,0.2);
+        background: rgba(255,255,255,0.07);
+        color: #fff !important;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 18px rgba(0,0,0,0.3);
+    }
+    .github-badge svg { flex-shrink: 0; }
+
+    /* ━━━━━━ Centered App Header ━━━━━━ */
+    .app-header-center {
+        text-align: center; padding: 24px 0 8px; position: relative; z-index: 10;
+    }
+    .app-header-title {
+        font-size: 1.6rem; font-weight: 900; color: #fff;
+        letter-spacing: -0.02em;
+    }
+    .app-header-sub {
+        font-size: 0.78rem; color: #555; margin-top: 4px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -723,29 +853,57 @@ with st.sidebar:
 # Main Content Area
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# Header + Top-right navigation
-col_title, col_nav = st.columns([2, 3])
-with col_title:
-    st.markdown(
-        '<div style="padding:8px 0 16px;">'
-        '<div class="main-title">⚡ LeadForge AI</div>'
-        '<div style="font-size:0.75rem;color:#555;">AI-powered lead discovery from Quora & Pinterest</div>'
-        '</div>', unsafe_allow_html=True
-    )
-with col_nav:
-    nav_cols = st.columns(5)
-    nav_items = [
-        ("🔍 AI Search", "search"),
-        ("📤 Bulk Upload", "bulk"),
-        ("🎯 Pipeline", "pipeline"),
-        ("📡 Monitors", "monitors"),
-        ("📊 Results", "results"),
-    ]
-    for i, (label, key) in enumerate(nav_items):
-        with nav_cols[i]:
-            if st.button(label, key=f"nav_{key}", use_container_width=True):
-                st.session_state.active_tab = key
-                st.rerun()
+# 3D Particle background + ambient glow
+st.markdown(
+    '<div class="particle-field"></div>'
+    '<div class="particle-field particle-field-2"></div>'
+    '<div class="ambient-glow"></div>',
+    unsafe_allow_html=True
+)
+
+# GitHub badge (top-right)
+st.markdown(
+    '<div class="github-badge-row">'
+    '<a href="https://github.com/Sujay1709/LeadForge-AI" target="_blank" class="github-badge">'
+    '<svg width="16" height="16" viewBox="0 0 16 16" fill="#ccc">'
+    '<path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38'
+    ' 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13'
+    '-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66'
+    '.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15'
+    '-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0'
+    ' 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56'
+    '.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07'
+    '-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>'
+    '</svg>'
+    'Star on GitHub'
+    '</a>'
+    '</div>',
+    unsafe_allow_html=True
+)
+
+# Centered header
+st.markdown(
+    '<div class="app-header-center">'
+    '<div class="app-header-title">⚡ LeadForge AI</div>'
+    '<div class="app-header-sub">AI-powered lead discovery from Quora &amp; Pinterest</div>'
+    '</div>',
+    unsafe_allow_html=True
+)
+
+# Centered minimalist navigation tabs
+_, nc1, nc2, nc3, nc4, nc5, _ = st.columns([1.2, 1, 1, 1, 1, 1, 1.2])
+nav_items = [
+    ("AI Search", "search"),
+    ("Bulk Upload", "bulk"),
+    ("Pipeline", "pipeline"),
+    ("Monitors", "monitors"),
+    ("Results", "results"),
+]
+for i, (label, key) in enumerate(nav_items):
+    with [nc1, nc2, nc3, nc4, nc5][i]:
+        if st.button(label, key=f"nav_{key}", use_container_width=True):
+            st.session_state.active_tab = key
+            st.rerun()
 
 active_tab = st.session_state.active_tab
 
@@ -1327,7 +1485,7 @@ if active_tab == "results":
     else:
         st.markdown(
             '<div style="text-align:center;padding:80px 0;color:#333;">'
-            '<div style="font-size:3rem;margin-bottom:12px;">🌊</div>'
+            '<div style="font-size:3rem;margin-bottom:12px;">📊</div>'
             '<div style="font-size:1.1rem;color:#555;">No leads yet</div>'
             '<div style="font-size:0.82rem;color:#333;">Run an AI search or upload a CSV to get started</div>'
             '</div>', unsafe_allow_html=True
