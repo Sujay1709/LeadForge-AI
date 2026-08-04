@@ -717,7 +717,7 @@ if not st.session_state.show_app:
         '<h3>Sujay Gopal</h3>'
         '<div class="role">Builder &amp; Developer</div>'
         '<p>LeadForge AI was built to solve the #1 problem for startups: finding qualified leads without expensive tools. '
-        'It combines Firecrawl for web intelligence, Google Gemini for AI analysis, and Composio for seamless exports — '
+        'It uses DuckDuckGo for free web search, Google Gemini for AI analysis, and Composio for seamless exports — '
         'creating an end-to-end lead discovery engine that anyone can use.</p>'
         '</div>'
         '</div></div>',
@@ -727,7 +727,7 @@ if not st.session_state.show_app:
     # ── Footer ──
     st.markdown(
         '<div class="landing-footer">'
-        'LeadForge AI · Built with Streamlit · Firecrawl · Gemini · Composio<br>'
+        'LeadForge AI · Built with Streamlit · DuckDuckGo · Gemini · Composio<br>'
         '© 2026 Sujay Gopal. All rights reserved.'
         '</div>',
         unsafe_allow_html=True
@@ -741,7 +741,6 @@ if not st.session_state.show_app:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 _keys = get_api_keys()
 google_key = _keys["google"]
-firecrawl_key = _keys["firecrawl"]
 composio_key = _keys["composio"]
 
 
@@ -819,19 +818,18 @@ with st.sidebar:
     # Connected Services
     st.markdown("### Services")
     g_color = "#c6ff00" if google_key else "#ff5252"
-    f_color = "#c6ff00" if firecrawl_key else "#ff5252"
     c_color = "#c6ff00" if composio_key else "#666"
 
     st.markdown(
         f'<div class="api-card">'
         f'<div class="api-name">🧠 Gemini</div>'
-        f'<div class="api-desc">Query transform · {DEFAULT_MODEL}</div>'
+        f'<div class="api-desc">Query transform + extraction · {DEFAULT_MODEL}</div>'
         f'<div class="api-status" style="color:{g_color};">{"● Connected" if google_key else "○ Missing"}</div>'
         f'</div>'
         f'<div class="api-card">'
-        f'<div class="api-name">🔥 Firecrawl</div>'
-        f'<div class="api-desc">Web search + AI extraction</div>'
-        f'<div class="api-status" style="color:{f_color};">{"● Connected" if firecrawl_key else "○ Missing"}</div>'
+        f'<div class="api-name">🔍 DuckDuckGo</div>'
+        f'<div class="api-desc">Free web search · No key needed</div>'
+        f'<div class="api-status" style="color:#c6ff00;">● Free</div>'
         f'</div>'
         f'<div class="api-card">'
         f'<div class="api-name">📊 Composio</div>'
@@ -917,32 +915,12 @@ st.markdown(
     '</div>', unsafe_allow_html=True
 )
 
-# Firecrawl credit check
-if firecrawl_key:
-    try:
-        _credit_resp = requests.get(
-            "https://api.firecrawl.dev/v1/account",
-            headers={"Authorization": f"Bearer {firecrawl_key}"},
-            timeout=5,
-        )
-        if _credit_resp.status_code == 200:
-            _credit_data = _credit_resp.json()
-            _remaining = _credit_data.get("remaining_credits", _credit_data.get("credits"))
-            if _remaining is not None:
-                _ccolor = "#c6ff00" if _remaining > 10 else "#ffab00" if _remaining > 0 else "#ff5252"
-                st.markdown(
-                    f'<div style="text-align:right;font-size:0.72rem;color:{_ccolor};margin:-4px 0 8px;">'
-                    f'🔥 Firecrawl credits: {_remaining} remaining</div>',
-                    unsafe_allow_html=True
-                )
-        elif _credit_resp.status_code == 402:
-            st.markdown(
-                '<div class="error-banner">🔥 Firecrawl credits exhausted — '
-                '<a href="https://www.firecrawl.dev/app/api-keys" style="color:#c6ff00;">add credits</a></div>',
-                unsafe_allow_html=True
-            )
-    except Exception:
-        pass
+# Free search engine status
+st.markdown(
+    '<div style="text-align:right;font-size:0.72rem;color:#c6ff00;margin:-4px 0 8px;">'
+    '🔍 DuckDuckGo · Free unlimited searches</div>',
+    unsafe_allow_html=True
+)
 
 st.markdown("---")
 
@@ -1048,7 +1026,7 @@ if active_tab == "search":
             # Step 2 — Search sources
             with st.status(f"🔍 Searching {', '.join(selected_sources)} for {num_links} pages each...", expanded=True) as s:
                 url_items = search_for_urls(
-                    company_description, firecrawl_key, num_links,
+                    company_description, num_links=num_links,
                     sources=selected_sources,
                 )
                 if not url_items:
@@ -1062,7 +1040,7 @@ if active_tab == "search":
 
             # Step 3 — Extract leads
             with st.status("🧠 Extracting lead data...", expanded=True) as s:
-                user_info_list = extract_user_info_from_urls(url_items, firecrawl_key)
+                user_info_list = extract_user_info_from_urls(url_items, google_api_key=google_key)
                 leads = format_leads_to_flat_json(user_info_list)
                 if not leads:
                     st.warning("No leads extracted. Try a different query.")
@@ -1171,20 +1149,11 @@ if active_tab == "search":
                     st.success(f"Added {len(df)} leads to pipeline")
 
         except requests.exceptions.HTTPError as e:
-            if e.response is not None and e.response.status_code == 402:
-                st.markdown(
-                    '<div class="error-banner">'
-                    '💳 Firecrawl credits exhausted (402 Payment Required). '
-                    '<a href="https://www.firecrawl.dev/app/api-keys" style="color:#c6ff00;">Add credits here</a> '
-                    'or reduce pages per search.'
-                    '</div>', unsafe_allow_html=True
-                )
-            else:
-                st.markdown(f'<div class="error-banner">HTTP Error: {e}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="error-banner">HTTP Error: {e}</div>', unsafe_allow_html=True)
         except Exception as e:
             error_msg = str(e)
             # Never expose API keys in error messages
-            for key_val in [google_key, firecrawl_key, composio_key]:
+            for key_val in [google_key, composio_key]:
                 if key_val and key_val in error_msg:
                     error_msg = error_msg.replace(key_val, "***")
             st.markdown(f'<div class="error-banner">Something went wrong: {error_msg}</div>', unsafe_allow_html=True)
@@ -1495,6 +1464,6 @@ if active_tab == "results":
 # Footer
 st.markdown(
     '<div class="app-footer">'
-    'LeadForge AI · Firecrawl · Gemini · Composio · Streamlit'
+    'LeadForge AI · DuckDuckGo · Gemini · Composio · Streamlit'
     '</div>', unsafe_allow_html=True
 )
