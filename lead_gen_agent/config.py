@@ -21,7 +21,7 @@ except ImportError:
 # Streamlit Cloud secrets fallback
 try:
     import streamlit as st
-    for key in ("GOOGLE_API_KEY", "FIRECRAWL_API_KEY", "COMPOSIO_API_KEY"):
+    for key in ("GOOGLE_API_KEY", "COMPOSIO_API_KEY"):
         if key in st.secrets and not os.getenv(key):
             os.environ[key] = st.secrets[key]
 except Exception:
@@ -54,7 +54,6 @@ def get_api_keys() -> dict:
     """Load and validate API keys from environment variables."""
     keys = {
         "google": os.getenv("GOOGLE_API_KEY", "").strip(),
-        "firecrawl": os.getenv("FIRECRAWL_API_KEY", "").strip(),
         "composio": os.getenv("COMPOSIO_API_KEY", "").strip(),
     }
     return keys
