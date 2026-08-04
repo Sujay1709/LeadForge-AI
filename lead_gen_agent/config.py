@@ -115,6 +115,7 @@ DEFAULT_MODEL = "gemini-2.5-flash"
 
 # Supported sources
 AVAILABLE_SOURCES = {
+    "web": {"label": "Live Web", "icon": "🌐", "description": "Grounded websites, papers, and PDFs"},
     "quora": {"label": "Quora", "icon": "🔶", "description": "Q&A discussions"},
     "pinterest": {"label": "Pinterest", "icon": "📌", "description": "Visual inspiration & templates"},
 }

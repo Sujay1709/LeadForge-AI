@@ -19,6 +19,7 @@ from agents import (
     create_prompt_transform_agent, transform_query, write_to_google_sheets,
     enrich_leads_batch,
 )
+from search_recovery import find_urls_with_recovery
 from tools import research_topic
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -137,6 +138,7 @@ st.markdown("""
     }
     .source-quora { background: rgba(185,43,39,0.15); color: #e74c3c; }
     .source-pinterest { background: rgba(189,8,28,0.15); color: #e60023; }
+    .source-web { background: rgba(66,165,245,0.15); color: #64b5f6; }
 
     /* ── Metric cards ── */
     .metric-row { display: flex; gap: 12px; margin: 1rem 0; }
@@ -762,7 +764,7 @@ with st.sidebar:
     selected_sources = st.multiselect(
         "Search platforms",
         options=list(AVAILABLE_SOURCES.keys()),
-        default=["quora"],
+        default=["web", "quora"],
         format_func=lambda x: f"{AVAILABLE_SOURCES[x]['icon']} {AVAILABLE_SOURCES[x]['label']}",
         label_visibility="collapsed",
     )
@@ -957,7 +959,7 @@ if active_tab == "search":
         user_query = st.text_area(
             "query",
             value=prefill,
-            placeholder="e.g., Pizza website templates and design inspiration\n\nDescribe leads, topics, or content you want to find across Quora and Pinterest.",
+            placeholder="e.g., AI research papers, data-science professors at ASU, or SaaS founders discussing onboarding\n\nSearch live websites, papers, and optional Quora/Pinterest discussions.",
             height=100, label_visibility="collapsed",
         )
     with col_go:
@@ -1005,7 +1007,8 @@ if active_tab == "search":
 
             # Step 1.5 — Web Research
             research_context = ""
-            if enable_research:
+            live_web_results = []
+            if enable_research or "web" in selected_sources:
                 with st.status("🌐 Researching topic...", expanded=True) as s:
                     research = research_topic(company_description, google_key)
                     google_count = len(research.get("google_results", []))
@@ -1021,31 +1024,75 @@ if active_tab == "search":
                                 st.write(f"- {title}")
 
                     research_context = research.get("summary_context", "")
-                    s.update(label=f"✅ Research: {google_count} web + {wiki_count} wiki results", state="complete")
+                    live_web_results = research.get("live_results", [])
+                    s.update(label=f"✅ Research: {len(live_web_results)} live URLs + {wiki_count} wiki results", state="complete")
 
-            # Step 2 — Search sources
-            with st.status(f"🔍 Searching {', '.join(selected_sources)} for {num_links} pages each...", expanded=True) as s:
-                url_items = search_for_urls(
-                    company_description, num_links=num_links,
-                    sources=selected_sources,
-                )
-                if not url_items:
-                    st.warning("No URLs found. Try rephrasing your query or adding more sources.")
-                    st.stop()
+            if "web" in selected_sources:
+                st.markdown("### 🌐 Live web results")
+                if live_web_results:
+                    for result in live_web_results:
+                        title = result.get("title", "Web result")
+                        link = result.get("link", "")
+                        source = result.get("source", "Web")
+                        result_type = result.get("result_type", "Website")
+                        snippet = result.get("snippet", "")
+                        st.markdown(f"**[{title}]({link})** · `{source}` · {result_type}")
+                        if snippet:
+                            st.caption(snippet)
+                        if result.get("download_url"):
+                            st.markdown(f"[⬇ Download PDF]({result['download_url']})")
+                else:
+                    st.warning("No live web URLs were returned. Check the Gemini API key and try again.")
 
-                for i, item in enumerate(url_items, 1):
-                    source_label = item.get("source", "quora").capitalize()
-                    st.write(f"{i}. [{source_label}] {item['url']}")
-                s.update(label=f"✅ Found {len(url_items)} pages across {len(selected_sources)} sources", state="complete")
+            # Step 2 — Search discussion sources. Live Web results above are
+            # already complete URLs and do not need social-profile extraction.
+            discussion_sources = [s for s in selected_sources if s in {"quora", "pinterest"}]
+            url_items = []
+            if discussion_sources:
+                with st.status(f"🔍 Searching {', '.join(discussion_sources)} for {num_links} pages each...", expanded=True) as s:
+                    search_result = find_urls_with_recovery(
+                        search_for_urls,
+                        query=company_description,
+                        sources=discussion_sources,
+                        num_links=num_links,
+                        google_api_key=google_key,
+                    )
+                    for attempt in search_result.attempts:
+                        message = f"{attempt.name}: {attempt.detail}"
+                        if attempt.outcome == "failed":
+                            st.error(f"⚠️ {message}")
+                        elif attempt.outcome == "recovered":
+                            st.warning(f"🛠️ {message}")
+                        else:
+                            st.write(f"{'✅' if attempt.outcome == 'success' else 'ℹ️'} {message}")
 
-            # Step 3 — Extract leads
-            with st.status("🧠 Extracting lead data...", expanded=True) as s:
-                user_info_list = extract_user_info_from_urls(url_items, google_api_key=google_key)
-                leads = format_leads_to_flat_json(user_info_list)
-                if not leads:
-                    st.warning("No leads extracted. Try a different query.")
-                    st.stop()
-                s.update(label=f"✅ Extracted {len(leads)} leads", state="complete")
+                    url_items = search_result.url_items
+                    if not url_items:
+                        st.warning(
+                            "No discussion pages were found after all recovery steps. The live "
+                            "web results above are still available."
+                        )
+                    else:
+                        for i, item in enumerate(url_items, 1):
+                            source_label = item.get("source", "quora").capitalize()
+                            st.write(f"{i}. [{source_label}] {item['url']}")
+                        s.update(label=f"✅ Found {len(url_items)} discussion pages", state="complete")
+
+            # Step 3 — Extract leads only from social discussion pages.
+            leads = []
+            if url_items:
+                with st.status("🧠 Extracting lead data...", expanded=True) as s:
+                    user_info_list = extract_user_info_from_urls(url_items, google_api_key=google_key)
+                    leads = format_leads_to_flat_json(user_info_list)
+                    if not leads:
+                        s.update(label="ℹ️ No social profiles extracted; live web results remain available", state="complete")
+                    else:
+                        s.update(label=f"✅ Extracted {len(leads)} leads", state="complete")
+
+            if not leads:
+                if live_web_results:
+                    st.info("Live web retrieval completed. Select Quora or Pinterest to additionally extract social leads.")
+                st.stop()
 
             # Score leads
             df = pd.DataFrame(leads)

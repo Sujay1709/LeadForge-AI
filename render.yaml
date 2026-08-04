@@ -4,12 +4,10 @@ services:
     name: leadforge-ai
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: starter
+    plan: starter  # $7/mo — upgrade to standard ($25/mo) for production
     healthCheckPath: /_stcore/health
     envVars:
       - key: GOOGLE_API_KEY
-        sync: false
-      - key: FIRECRAWL_API_KEY
-        sync: false
+        sync: false  # set manually in Render dashboard
       - key: COMPOSIO_API_KEY
         sync: false

@@ -12,49 +12,25 @@ import os
 from typing import List
 from google import genai
 from config import DEFAULT_MODEL
+from prompt_examples import format_query_examples
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Query Transform Agent
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-TRANSFORM_PROMPT = """Transform detailed queries into concise descriptions (3-6 words).
+TRANSFORM_PROMPT = f"""Convert a user request into a focused web-search phrase.
 
 Examples:
-Input: "Looking for users who need AI video editing software"
-Output: AI video editing software
-
-Input: "Find SaaS founders who struggle with customer onboarding"
-Output: SaaS customer onboarding tools
-
-Input: "Looking for companies that need a better CRM for small sales teams"
-Output: best CRM small sales team
-
-Input: "Find businesses looking to automate their invoice and billing process"
-Output: automate invoicing billing software
-
-Input: "Find marketing managers who need help with SEO and organic traffic growth"
-Output: SEO organic traffic growth tools
-
-Input: "Looking for e-commerce store owners struggling with email marketing automation"
-Output: ecommerce email marketing automation
-
-Input: "Find engineering teams looking for CI/CD pipeline improvements"
-Output: CI CD pipeline best practices
-
-Input: "Find HR teams that need applicant tracking systems for high-volume hiring"
-Output: applicant tracking system hiring
-
-Input: "Find CFOs looking for better financial forecasting and budgeting tools"
-Output: financial forecasting budgeting software
-
-Input: "Find healthcare providers looking for patient scheduling and telehealth platforms"
-Output: patient scheduling telehealth platform
+{format_query_examples()}
 
 Rules:
-- Return ONLY the concise description, nothing else.
-- 3-6 words max. Drop filler words.
-- Use pain-point language Quora users would search for."""
+- Return ONLY the search phrase, with no labels, quotes, or explanation.
+- Use 3-8 specific words. Drop filler words, but preserve important entities
+  such as university names, technologies, and job titles.
+- For lead-generation requests, retain the pain point or buyer intent.
+- For research or academic requests, retain the subject and institution rather
+  than forcing the request into sales language."""
 
 
 def create_prompt_transform_agent(google_api_key: str):
